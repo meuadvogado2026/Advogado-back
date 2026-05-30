@@ -1,0 +1,39 @@
+{
+  "name": "meu-advogado-20-back",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "migration:check": "tsx scripts/migration-check.ts",
+    "migration:apply": "tsx scripts/migration-check.ts --apply",
+    "seed:test-users": "tsx scripts/seed-test-users.ts",
+    "auth:smoke": "tsx scripts/auth-smoke.ts",
+    "form:smoke": "tsx scripts/admin-form-smoke.ts",
+    "match:smoke": "tsx scripts/match-smoke.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "harness": "tsx scripts/harness.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/rate-limit": "^10.1.0",
+    "@supabase/supabase-js": "^2.106.2",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

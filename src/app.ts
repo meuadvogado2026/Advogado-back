@@ -1,0 +1,35 @@
+import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
+import Fastify from "fastify";
+import { loadEnv } from "./config/env.js";
+import { registerAdminLawyerRoutes } from "./modules/adminLawyers/routes.js";
+import { registerAreaRoutes } from "./modules/areas/routes.js";
+import { registerHealthRoutes } from "./modules/health/routes.js";
+import { registerMatchRoutes } from "./modules/match/routes.js";
+import { createRepositories } from "./repositories/index.js";
+
+export async function buildApp() {
+  const env = loadEnv();
+  const repositories = createRepositories(env);
+  const app = Fastify({
+    logger: env.NODE_ENV === "production"
+  });
+
+  await app.register(cors, {
+    origin: env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
+  });
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute"
+  });
+
+  await registerHealthRoutes(app);
+
+  await app.register(async (v1) => {
+    await registerAreaRoutes(v1, repositories.legalSpecialties);
+    await registerMatchRoutes(v1, env, repositories);
+    await registerAdminLawyerRoutes(v1, env, repositories);
+  }, { prefix: env.API_BASE_PATH });
+
+  return app;
+}

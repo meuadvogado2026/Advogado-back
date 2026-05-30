@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: Meu Advogado 2.0 API
+  version: 0.2.0-auth-supabase-foundation
+servers:
+  - url: http://localhost:3333
+paths:
+  /health:
+    get:
+      summary: Healthcheck publico da API
+      responses:
+        "200":
+          description: API operacional
+  /v1/areas:
+    get:
+      summary: Lista areas juridicas iniciais
+      responses:
+        "200":
+          description: Areas juridicas retornadas
+  /v1/match:
+    post:
+      summary: Solicita match por localizacao e areas juridicas
+      description: Stub de fundacao. O match real sera implementado com PostGIS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng, accuracyM, areaIds]
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+                accuracyM:
+                  type: number
+                areaIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Resultado stubado de match
+        "422":
+          description: Payload invalido
+  /v1/admin/lawyers:
+    get:
+      summary: Lista advogados cadastrados pelo admin
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista paginada
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
+    post:
+      summary: Cadastra advogado com CEP obrigatorio
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Advogado criado via repositorio backend
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
+        "422":
+          description: Payload invalido
+  /v1/admin/lawyers/{id}:
+    patch:
+      summary: Atualiza advogado por id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Advogado atualizado
+        "404":
+          description: Advogado nao encontrado
+        "422":
+          description: Payload invalido
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Supabase JWT
