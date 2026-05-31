@@ -1,8 +1,16 @@
 # Backend Status - Meu Advogado 2.0
 
-**Ultima atualizacao:** 2026-05-30  
-**Fase:** SPEC 001 APLICADA NO SUPABASE / SPEC 002 (GEOCODING BACKEND) IMPLEMENTADA  
+**Ultima atualizacao:** 2026-05-31  
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPECS 001+002 VALIDADAS E2E  
 **Veredito:** OK_COM_RESSALVAS
+
+## Producao (Railway)
+
+- URL publica: `https://advogado-back-production.up.railway.app` (HTTPS).
+- Deploy via GitHub `meuadvogado2026/Advogado-back` (branch `main`), redeploy automatico a cada push.
+- Node 22 exigido (`engines`/`.nvmrc`): supabase-js/realtime quebra em Node 20 por falta de WebSocket nativo.
+- `PORT=8080` fixada nas Variables; demais envs (NODE_ENV=production, SUPABASE_URL/ANON/SERVICE_ROLE, GEOCODING_PROVIDER=nominatim) setadas no painel.
+- Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, /v1/areas 200, match SP/civil matched 0km, SP/criminal empty, sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200; match_events do smoke limpos.
 
 ## Concluido
 
