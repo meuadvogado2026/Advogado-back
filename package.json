@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=22 <23"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -19,6 +19,7 @@
     "auth:smoke": "tsx scripts/auth-smoke.ts",
     "form:smoke": "tsx scripts/admin-form-smoke.ts",
     "match:smoke": "tsx scripts/match-smoke.ts",
+    "prod:smoke": "tsx scripts/prod-smoke.ts",
     "smoke": "tsx scripts/smoke.ts",
     "harness": "tsx scripts/harness.ts"
   },

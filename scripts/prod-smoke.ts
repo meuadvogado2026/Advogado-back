@@ -1,0 +1,115 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { createClient } from "@supabase/supabase-js";
+import { loadEnv } from "../src/config/env.js";
+import { createSupabaseAdminClient } from "../src/lib/supabase.js";
+
+/**
+ * Smoke e2e contra o backend de PRODUCAO (Railway) via HTTP real.
+ *
+ * Diferente de match-smoke/form-smoke (que usam app.inject em processo), este
+ * faz fetch contra a URL publica, validando o deploy de ponta a ponta:
+ *  - GET  /health
+ *  - GET  /v1/areas
+ *  - POST /v1/match (cliente real): matched SP/civil, empty SP/criminal, 401 sem token
+ *  - POST /v1/admin/geocode/cep (admin real): 200
+ *  - GET  /v1/admin/lawyers (admin real): 200 persistence=supabase
+ * Limpa os match_events criados (residuo LGPD). Tokens nunca impressos.
+ *
+ * Uso (cwd = back):
+ *   $env:SUPABASE_ANON_KEY=<anon>; $env:PROD_BASE_URL="https://...up.railway.app"; npm run prod:smoke
+ */
+
+const env = loadEnv();
+if (!env.SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY e obrigatoria (anon key publicavel).");
+const BASE = (process.env.PROD_BASE_URL ?? "").replace(/\/$/, "");
+if (!BASE) throw new Error("PROD_BASE_URL e obrigatoria (ex.: https://seu-app.up.railway.app).");
+
+const ADMIN_EMAIL = "admin@advogado20.com";
+const CLIENT_EMAIL = "usuario@advogado20.com";
+const SP_FIXTURE = { lat: -23.561414, lng: -46.655881 };
+const COVERED = new Set(["civil", "consumidor", "trabalhista", "familia"]);
+
+function cred(raw: string, email: string) {
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  for (let i = 0; i < lines.length; i += 2) if (lines[i] === email && lines[i + 1]) return { email, password: lines[i + 1]! };
+  throw new Error(`Credencial de ${email} nao encontrada.`);
+}
+
+async function login(authClient: { auth: { signInWithPassword: (c: { email: string; password: string }) => Promise<{ data: { session: { access_token?: string } | null }; error: { message: string } | null }> } }, c: { email: string; password: string }) {
+  const { data, error } = await authClient.auth.signInWithPassword(c);
+  if (error || !data.session?.access_token) throw new Error(`login ${c.email}: ${error?.message ?? "sem sessao"}`);
+  return data.session.access_token;
+}
+
+async function call(path: string, init?: RequestInit) {
+  const res = await fetch(`${BASE}${path}`, init);
+  let body: unknown = null;
+  try { body = await res.json(); } catch { /* sem corpo */ }
+  return { status: res.status, body };
+}
+
+const credsRaw = await readFile(resolve(process.cwd(), "..", "Credenciais para testes.txt"), "utf8");
+const authClient = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+const adminToken = await login(authClient, cred(credsRaw, ADMIN_EMAIL));
+const clientToken = await login(authClient, cred(credsRaw, CLIENT_EMAIL));
+const adminH = { authorization: `Bearer ${adminToken}`, "content-type": "application/json" };
+const clientH = { authorization: `Bearer ${clientToken}`, "content-type": "application/json" };
+
+const steps: Array<Record<string, unknown>> = [];
+let ok = true;
+const startedAt = new Date(Date.now() - 1000).toISOString();
+const mark = (s: Record<string, unknown>, pass: boolean) => { ok &&= pass; steps.push({ ...s, ok: pass }); };
+
+// health
+const health = await call("/health");
+mark({ step: "GET /health", status: health.status }, health.status === 200);
+
+// areas
+const areas = await call("/v1/areas");
+const list = (areas.body as { areas?: Array<{ id: string; slug: string }> })?.areas ?? [];
+const civil = list.find((a) => a.slug === "civil");
+const uncovered = list.find((a) => !COVERED.has(a.slug));
+mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && Boolean(civil));
+
+// match matched
+if (civil) {
+  const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [civil.id] }) });
+  const b = m.body as { status?: string; lawyer?: { city?: string }; distanceKm?: number };
+  mark({ step: "POST /v1/match SP/civil", status: m.status, matchStatus: b?.status, city: b?.lawyer?.city, distanceKm: b?.distanceKm }, m.status === 200 && b?.status === "matched");
+}
+// match empty
+if (uncovered) {
+  const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [uncovered.id] }) });
+  mark({ step: `POST /v1/match SP/${uncovered.slug}`, status: m.status, matchStatus: (m.body as { status?: string })?.status }, m.status === 200 && (m.body as { status?: string })?.status === "empty");
+}
+// match no token
+const noTok = await call("/v1/match", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: civil ? [civil.id] : ["x"] }) });
+mark({ step: "POST /v1/match sem token", status: noTok.status }, noTok.status === 401);
+
+// admin geocode
+const geo = await call("/v1/admin/geocode/cep", { method: "POST", headers: adminH, body: JSON.stringify({ cep: "01310-100" }) });
+mark({ step: "POST /v1/admin/geocode/cep", status: geo.status, persistence: (geo.body as { persistence?: string })?.persistence }, geo.status === 200);
+
+// admin list
+const lw = await call("/v1/admin/lawyers", { headers: adminH });
+const pers = (lw.body as { persistence?: string })?.persistence;
+mark({ step: "GET /v1/admin/lawyers", status: lw.status, persistence: pers }, lw.status === 200 && pers === "supabase");
+
+// cleanup match_events
+let cleanup: Record<string, unknown> = { attempted: false };
+const admin = createSupabaseAdminClient(env);
+if (admin) {
+  const { data: prof } = await admin.from("profiles").select("id").eq("email", CLIENT_EMAIL).maybeSingle();
+  const pid = (prof as { id?: string } | null)?.id;
+  if (pid) {
+    const del = await admin.from("match_events").delete().eq("client_profile_id", pid).gte("created_at", startedAt).select("id");
+    cleanup = { attempted: true, eventsDeleted: del.data?.length ?? 0, ok: !del.error };
+    ok &&= !del.error;
+  }
+} else {
+  cleanup = { attempted: false, reason: "service role local indisponivel (limpe match_events manualmente se necessario)" };
+}
+
+console.log(JSON.stringify({ result: ok ? "OK" : "FALHOU", base: BASE, tokens: "REDACTED", steps, cleanup }, null, 2));
+process.exit(ok ? 0 : 1);
