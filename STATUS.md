@@ -1,7 +1,7 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-05-31  
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPECS 001+002 VALIDADAS E2E  
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 004 ENDPOINT CLIENTE IMPLEMENTADO LOCALMENTE
 **Veredito:** OK_COM_RESSALVAS
 
 ## Producao (Railway)
@@ -66,9 +66,11 @@
 
 ## Em Andamento
 
-- [x] Revalidar o match real contra Supabase (PostGIS) com token de cliente real (`scripts/match-smoke.ts`: matched SP/civil 0km, empty SP/criminal, 401 sem token; match_events do smoke limpos via service role). Falta apenas a perna de GPS fisica no device via Expo Go.
+- [x] Revalidar o match real contra Supabase (PostGIS) com token de cliente real (`scripts/match-smoke.ts`: matched SP/civil 0km, empty SP/criminal, 401 sem token; match_events do smoke limpos via service role). Perna de GPS fisica tambem validada no APK preview em device Android real, sem fallback dev.
 - [x] Persistir a coordenada geocodificada no `lawyer_profiles` no fluxo de cadastro/edicao admin: `lawyers.create`/`update` recebem `{ lat, lng }` e gravam `office_lat`, `office_lng` e `office_location = SRID=4326;POINT(lng lat)`. A rota geocodifica o CEP, passa a coordenada ao repo e bloqueia `status=approved` sem coordenada valida (422); `update` re-geocodifica quando o CEP muda. Testes: cadastro persiste coordenada, aprovacao sem coordenada bloqueada, aprovacao com re-geocode permitida. Harness exit code 0 (25 testes).
 - [x] UI do formulario admin consumindo `POST /v1/admin/geocode/cep` (task 6 da spec 002), validada e2e com token admin real (`scripts/admin-form-smoke.ts`): geocode 200, list 200 `persistence=supabase`, create 201 + limpeza via service role, sem residuo.
+- [x] Implementar `GET /v1/lawyers/:id` com allowlist cliente segura conforme spec 004.
+- [x] Validar `GET /v1/lawyers/:id` com TDD `401`, `403`, `404`, `200`, Harness backend e smoke Supabase real sem campos proibidos.
 - [ ] Definir TTL/anonimizacao de `match_events.client_location` (retencao LGPD sugerida: 90 dias).
 
 ## Bloqueios
@@ -80,4 +82,4 @@
 
 ## Proximo Passo
 
-Formulario admin (spec 002, task 6) validado e2e com token admin real e match real validado contra Supabase/PostGIS com token de cliente real (`scripts/admin-form-smoke.ts`, `scripts/match-smoke.ts`), ambos com limpeza e sem residuo. Falta apenas a perna de GPS fisica no device (match por localizacao real via Expo Go); depois iniciar spec 003 (release interno Android).
+Endpoint cliente da spec 004 implementado e validado localmente/Supabase real sem migration. Proxima perna: implementar a navegacao mobile `Home -> Perfil -> WhatsApp`. Antes de consumir o endpoint em producao Railway, publicar o diff backend e executar smoke pos-deploy.

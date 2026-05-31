@@ -13,6 +13,8 @@ import type {
   NearestLawyerInput,
   Profile,
   ProfileRepository,
+  PublicLawyerProfile,
+  PublicLawyerProfileRepository,
   Repositories
 } from "./types.js";
 
@@ -211,6 +213,61 @@ class SupabaseLawyerRepository implements LawyerRepository {
   }
 }
 
+type PublicLawyerProfileRow = {
+  id: string;
+  oab_number: string;
+  oab_state: string;
+  whatsapp: string;
+  office_city: string | null;
+  office_state: string | null;
+  profiles: { name: string } | Array<{ name: string }>;
+  lawyer_specialties: Array<{
+    specialty_id: string;
+    legal_specialties: { id: string; name: string } | Array<{ id: string; name: string }>;
+  }>;
+};
+
+function firstRelation<T>(value: T | T[]): T {
+  const relation = Array.isArray(value) ? value[0] : value;
+  if (!relation) {
+    throw new Error("lawyer_profiles.getApprovedPublicById: relacao obrigatoria ausente.");
+  }
+  return relation;
+}
+
+class SupabasePublicLawyerProfileRepository implements PublicLawyerProfileRepository {
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  async getApprovedById(id: string): Promise<PublicLawyerProfile | null> {
+    const { data, error } = await this.supabase
+      .from("lawyer_profiles")
+      .select(
+        "id, oab_number, oab_state, whatsapp, office_city, office_state, profiles!inner(name), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
+      )
+      .eq("id", id)
+      .eq("status", "approved")
+      .maybeSingle();
+    assertSupabaseOk(error, "lawyer_profiles.getApprovedPublicById");
+    if (!data) return null;
+
+    const row = data as unknown as PublicLawyerProfileRow;
+    const profile = firstRelation(row.profiles);
+    const areas = row.lawyer_specialties.map((specialty) => firstRelation(specialty.legal_specialties));
+    return {
+      id: row.id,
+      name: profile.name,
+      oabNumber: row.oab_number,
+      oabState: row.oab_state,
+      city: row.office_city,
+      state: row.office_state,
+      areaIds: areas.map((area) => area.id),
+      areas,
+      whatsapp: row.whatsapp,
+      verified: true
+    };
+  }
+}
+
 class SupabaseAuditLogRepository implements AuditLogRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -294,6 +351,7 @@ export function createSupabaseRepositories(supabase: SupabaseClient): Repositori
     profiles,
     legalSpecialties: new SupabaseLegalSpecialtyRepository(supabase),
     lawyers: new SupabaseLawyerRepository(supabase, profiles),
+    publicLawyerProfiles: new SupabasePublicLawyerProfileRepository(supabase),
     auditLogs: new SupabaseAuditLogRepository(supabase),
     matches: new SupabaseMatchRepository(supabase),
     matchEvents: new SupabaseMatchEventRepository(supabase),

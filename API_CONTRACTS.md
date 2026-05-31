@@ -16,7 +16,7 @@
 
 - `GET /v1/areas`
 - `POST /v1/match` - exige Bearer token (`client` ou `admin`); ver contrato abaixo
-- `GET /v1/lawyers/:id`
+- `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client` ou `admin`)
 - `POST /v1/lawyers/:id/events`
 - `POST /v1/lawyers/:id/urgent-calls`
 
@@ -76,6 +76,35 @@ Regras:
 - Ordenado por distancia (PostGIS `ST_Distance`); raio maximo via `MATCH_MAX_RADIUS_KM` (default 200km).
 - `lawyer` expoe apenas campos seguros; nunca CEP/endereco completo nem PII interna.
 - Evento gravado em `match_events`; coordenada vai para o banco, nunca para logs.
+
+## GET /v1/lawyers/:id (spec 004)
+
+Requer `Authorization: Bearer <token>` (`client` ou `admin`). Retorna somente advogado
+aprovado para cliente e responde `404` seguro quando o perfil nao existe ou nao esta
+disponivel.
+
+Resposta `200`:
+
+```json
+{
+  "lawyer": {
+    "id": "...",
+    "name": "...",
+    "oabNumber": "...",
+    "oabState": "DF",
+    "city": "Brasilia",
+    "state": "DF",
+    "areaIds": ["..."],
+    "areas": [{ "id": "...", "name": "Direito Civil" }],
+    "whatsapp": "...",
+    "verified": true
+  }
+}
+```
+
+Nao expor CEP, endereco completo, coordenada, `office_location`, email, auditoria ou
+status interno. A distancia nao pertence a esta resposta: quando houver match, segue
+como contexto efemero da navegacao mobile.
 
 ## Padrao De Erro
 

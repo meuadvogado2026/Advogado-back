@@ -44,6 +44,24 @@ export interface LawyerRepository {
   update(id: string, patch: LawyerPatch, coordinates?: LawyerCoordinates): Promise<LawyerRecord | null>;
 }
 
+/** Allowlist publica do perfil profissional exposto ao cliente autenticado. */
+export type PublicLawyerProfile = {
+  id: string;
+  name: string;
+  oabNumber: string;
+  oabState: string;
+  city: string | null;
+  state: string | null;
+  areaIds: string[];
+  areas: Array<{ id: string; name: string }>;
+  whatsapp: string;
+  verified: true;
+};
+
+export interface PublicLawyerProfileRepository {
+  getApprovedById(id: string): Promise<PublicLawyerProfile | null>;
+}
+
 export interface AuditLogRepository {
   record(input: {
     actorProfileId?: string;
@@ -99,6 +117,7 @@ export type Repositories = {
   profiles: ProfileRepository;
   legalSpecialties: LegalSpecialtyRepository;
   lawyers: LawyerRepository;
+  publicLawyerProfiles: PublicLawyerProfileRepository;
   auditLogs: AuditLogRepository;
   matches: MatchRepository;
   matchEvents: MatchEventRepository;

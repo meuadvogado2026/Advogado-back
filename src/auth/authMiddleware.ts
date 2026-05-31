@@ -26,6 +26,8 @@ export function createAuthPreHandler(env: AppEnv, repositories: Repositories, al
         request.currentUser = { id: "test-admin-user", email: "admin@example.test", role: "admin" };
       } else if (token === env.TEST_AUTH_CLIENT_TOKEN) {
         request.currentUser = { id: "test-client-user", email: "client@example.test", role: "client" };
+      } else if (token === env.TEST_AUTH_LAWYER_TOKEN) {
+        request.currentUser = { id: "test-lawyer-user", email: "lawyer@example.test", role: "lawyer" };
       } else {
         return reply.code(401).send(apiError("UNAUTHORIZED", "Token invalido."));
       }

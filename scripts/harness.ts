@@ -30,12 +30,12 @@ const exitCode = steps.some((step) => step.exitCode !== 0) ? 1 : 0;
 const report = {
   environment: "back",
   cwd,
-  objective: "Harness da fundacao backend: tipos, testes, build e smoke API.",
+  objective: "Harness backend: tipos, testes, build, migrations dry-run e smoke API.",
   exitCode,
   result: exitCode === 0 ? "OK" : "FALHOU",
   gaps: [
     "Harness valida a migration estaticamente; aplicacoes manuais no Supabase devem ser registradas na documentacao.",
-    "Login completo nos clientes ainda nao implementado."
+    "Smoke Supabase real do perfil roda separadamente em npm run match:smoke para usar credencial cliente e limpeza de eventos."
   ],
   steps
 };

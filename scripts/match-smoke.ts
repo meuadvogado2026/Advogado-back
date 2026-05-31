@@ -13,6 +13,7 @@ import { createSupabaseAdminClient } from "../src/lib/supabase.js";
  *  - login cliente real via Supabase Auth (anon key publicavel);
  *  - GET /v1/areas -> ids reais de especialidades;
  *  - POST /v1/match perto da fixture SP (civil) -> 200 `matched`, advogado em Sao Paulo, distancia ~0;
+ *  - GET /v1/lawyers/:id para o match retornado -> 200 com allowlist publica segura;
  *  - POST /v1/match com area sem advogado aprovado -> 200 `empty`;
  *  - POST /v1/match sem token -> 401.
  *
@@ -64,6 +65,7 @@ let ok = true;
 
 // Marca o inicio da janela do smoke para a limpeza dos match_events.
 const startedAt = new Date(Date.now() - 1000).toISOString();
+let matchedLawyerId: string | undefined;
 
 // Areas reais.
 const areasRes = await app.inject({ method: "GET", url: "/v1/areas" });
@@ -88,8 +90,9 @@ if (civil) {
     headers: authHeader,
     payload: { ...SP_FIXTURE, accuracyM: 20, areaIds: [civil.id] }
   });
-  const body = matched.json() as { status?: string; lawyer?: { city?: string }; distanceKm?: number };
+  const body = matched.json() as { status?: string; lawyer?: { id?: string; city?: string }; distanceKm?: number };
   const matchedOk = matched.statusCode === 200 && body.status === "matched" && (body.distanceKm ?? 99) < 5;
+  matchedLawyerId = body.lawyer?.id;
   ok &&= matchedOk;
   steps.push({
     step: "POST /v1/match (SP/civil)",
@@ -101,7 +104,38 @@ if (civil) {
   });
 }
 
-// 2. empty: mesma coordenada, area sem advogado aprovado proximo.
+// 2. perfil publico seguro do advogado retornado.
+if (matchedLawyerId) {
+  const profile = await app.inject({
+    method: "GET",
+    url: `/v1/lawyers/${matchedLawyerId}`,
+    headers: authHeader
+  });
+  const body = profile.json() as {
+    lawyer?: Record<string, unknown> & { verified?: boolean; areas?: unknown[] };
+  };
+  const forbiddenFields = ["email", "officeCep", "officeNumber", "officeLat", "officeLng", "office_location"];
+  const hasForbiddenField = forbiddenFields.some((field) => body.lawyer?.[field] !== undefined);
+  const profileOk =
+    profile.statusCode === 200 &&
+    body.lawyer?.verified === true &&
+    Array.isArray(body.lawyer.areas) &&
+    !hasForbiddenField;
+  ok &&= profileOk;
+  steps.push({
+    step: "GET /v1/lawyers/:id (perfil publico)",
+    statusCode: profile.statusCode,
+    verified: body.lawyer?.verified ?? null,
+    areasCount: body.lawyer?.areas?.length ?? null,
+    hasForbiddenField,
+    ok: profileOk
+  });
+} else {
+  steps.push({ step: "GET /v1/lawyers/:id (perfil publico)", skipped: true, reason: "match sem lawyer.id" });
+  ok = false;
+}
+
+// 3. empty: mesma coordenada, area sem advogado aprovado proximo.
 if (uncovered) {
   const empty = await app.inject({
     method: "POST",
@@ -117,7 +151,7 @@ if (uncovered) {
   steps.push({ step: "POST /v1/match (empty)", skipped: true, reason: "nenhuma area sem cobertura disponivel" });
 }
 
-// 3. sem token -> 401.
+// 4. sem token -> 401.
 const noToken = await app.inject({
   method: "POST",
   url: "/v1/match",

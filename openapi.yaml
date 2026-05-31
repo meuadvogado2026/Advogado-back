@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Meu Advogado 2.0 API
-  version: 0.2.0-auth-supabase-foundation
+  version: 0.4.0-client-lawyer-profile
 servers:
   - url: http://localhost:3333
 paths:
@@ -20,7 +20,9 @@ paths:
   /v1/match:
     post:
       summary: Solicita match por localizacao e areas juridicas
-      description: Stub de fundacao. O match real sera implementado com PostGIS.
+      description: Retorna o advogado aprovado mais proximo e compativel via PostGIS.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -41,9 +43,75 @@ paths:
                     type: string
       responses:
         "200":
-          description: Resultado stubado de match
+          description: Resultado matched ou empty
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
         "422":
           description: Payload invalido
+  /v1/lawyers/{id}:
+    get:
+      summary: Retorna perfil profissional publico seguro para cliente autenticado
+      description: Retorna somente advogado aprovado. Perfil inexistente ou indisponivel responde 404 seguro.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Allowlist publica do perfil profissional
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lawyer]
+                properties:
+                  lawyer:
+                    type: object
+                    required: [id, name, oabNumber, oabState, city, state, areaIds, areas, whatsapp, verified]
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      oabNumber:
+                        type: string
+                      oabState:
+                        type: string
+                      city:
+                        type: [string, "null"]
+                      state:
+                        type: [string, "null"]
+                      areaIds:
+                        type: array
+                        items:
+                          type: string
+                      areas:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, name]
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                      whatsapp:
+                        type: string
+                      verified:
+                        type: boolean
+                        const: true
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
+        "404":
+          description: Perfil inexistente, nao aprovado ou indisponivel
   /v1/admin/lawyers:
     get:
       summary: Lista advogados cadastrados pelo admin

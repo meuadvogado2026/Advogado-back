@@ -102,6 +102,70 @@ describe("foundation API", () => {
     expect(response.json().status).toBe("empty");
   });
 
+  it("requires auth on client lawyer profile", async () => {
+    const app = await buildApp();
+    const response = await app.inject({ method: "GET", url: "/v1/lawyers/fixture-lawyer-sp" });
+    await app.close();
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("rejects lawyer role on client lawyer profile", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/lawyers/fixture-lawyer-sp",
+      headers: { authorization: "Bearer test-lawyer-token" }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe("FORBIDDEN");
+  });
+
+  it("returns safe 404 when client lawyer profile is unavailable", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/lawyers/fixture-lawyer-pending",
+      headers: { authorization: "Bearer test-client-token" }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error.code).toBe("NOT_FOUND");
+  });
+
+  it("returns approved client lawyer profile with public allowlist", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/lawyers/fixture-lawyer-sp",
+      headers: { authorization: "Bearer test-client-token" }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      lawyer: {
+        id: "fixture-lawyer-sp",
+        name: "Dra. Ana Geo",
+        oabNumber: "654321",
+        oabState: "SP",
+        city: "Sao Paulo",
+        state: "SP",
+        areaIds: ["civil", "consumidor"],
+        areas: [
+          { id: "civil", name: "Direito Civil" },
+          { id: "consumidor", name: "Direito do Consumidor" }
+        ],
+        whatsapp: "11988887777",
+        verified: true
+      }
+    });
+  });
+
   it("keeps areas public", async () => {
     const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/v1/areas" });

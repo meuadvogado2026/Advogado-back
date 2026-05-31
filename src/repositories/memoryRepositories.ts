@@ -11,6 +11,7 @@ import type {
   NearestLawyerInput,
   Profile,
   ProfileRepository,
+  PublicLawyerProfileRepository,
   Repositories
 } from "./types.js";
 
@@ -112,6 +113,8 @@ type MatchFixture = {
   lng: number;
   areaIds: string[];
   status: LawyerRecord["status"];
+  oabNumber: string;
+  oabState: string;
 };
 
 /**
@@ -129,7 +132,9 @@ const matchFixtures: MatchFixture[] = [
     lat: -23.561414,
     lng: -46.655881,
     areaIds: ["civil", "consumidor"],
-    status: "approved"
+    status: "approved",
+    oabNumber: "654321",
+    oabState: "SP"
   },
   {
     id: "fixture-lawyer-rj",
@@ -140,7 +145,9 @@ const matchFixtures: MatchFixture[] = [
     lat: -22.906847,
     lng: -43.172896,
     areaIds: ["trabalhista"],
-    status: "approved"
+    status: "approved",
+    oabNumber: "112233",
+    oabState: "RJ"
   },
   {
     // Mesmo perfil/area do SP, porem nao aprovado: nunca deve aparecer no match.
@@ -152,7 +159,9 @@ const matchFixtures: MatchFixture[] = [
     lat: -23.55052,
     lng: -46.633308,
     areaIds: ["civil"],
-    status: "pending_review"
+    status: "pending_review",
+    oabNumber: "000000",
+    oabState: "SP"
   }
 ];
 
@@ -198,6 +207,29 @@ class MemoryMatchRepository implements MatchRepository {
   }
 }
 
+class MemoryPublicLawyerProfileRepository implements PublicLawyerProfileRepository {
+  async getApprovedById(id: string) {
+    const fixture = matchFixtures.find((candidate) => candidate.id === id && candidate.status === "approved");
+    if (!fixture) return null;
+
+    return {
+      id: fixture.id,
+      name: fixture.name,
+      oabNumber: fixture.oabNumber,
+      oabState: fixture.oabState,
+      city: fixture.city,
+      state: fixture.state,
+      areaIds: fixture.areaIds,
+      areas: fixture.areaIds.map((areaId) => ({
+        id: areaId,
+        name: legalAreas.find((area) => area.id === areaId)?.name ?? areaId
+      })),
+      whatsapp: fixture.whatsapp,
+      verified: true as const
+    };
+  }
+}
+
 class MemoryMatchEventRepository implements MatchEventRepository {
   async record() {
     return;
@@ -210,6 +242,7 @@ export function createMemoryRepositories(): Repositories {
     profiles: profileRepository,
     legalSpecialties: new MemoryLegalSpecialtyRepository(),
     lawyers: new MemoryLawyerRepository(profileRepository),
+    publicLawyerProfiles: new MemoryPublicLawyerProfileRepository(),
     auditLogs: new MemoryAuditLogRepository(),
     matches: new MemoryMatchRepository(),
     matchEvents: new MemoryMatchEventRepository(),

@@ -12,6 +12,7 @@ import { createSupabaseAdminClient } from "../src/lib/supabase.js";
  *  - GET  /health
  *  - GET  /v1/areas
  *  - POST /v1/match (cliente real): matched SP/civil, empty SP/criminal, 401 sem token
+ *  - GET  /v1/lawyers/:id (cliente real): 200 com allowlist publica, 401 sem token
  *  - POST /v1/admin/geocode/cep (admin real): 200
  *  - GET  /v1/admin/lawyers (admin real): 200 persistence=supabase
  * Limpa os match_events criados (residuo LGPD). Tokens nunca impressos.
@@ -29,6 +30,8 @@ const ADMIN_EMAIL = "admin@advogado20.com";
 const CLIENT_EMAIL = "usuario@advogado20.com";
 const SP_FIXTURE = { lat: -23.561414, lng: -46.655881 };
 const COVERED = new Set(["civil", "consumidor", "trabalhista", "familia"]);
+const PUBLIC_PROFILE_KEYS = new Set(["id", "name", "oabNumber", "oabState", "city", "state", "areaIds", "areas", "whatsapp", "verified"]);
+const PUBLIC_AREA_KEYS = new Set(["id", "name"]);
 
 function cred(raw: string, email: string) {
   const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -70,14 +73,40 @@ const areas = await call("/v1/areas");
 const list = (areas.body as { areas?: Array<{ id: string; slug: string }> })?.areas ?? [];
 const civil = list.find((a) => a.slug === "civil");
 const uncovered = list.find((a) => !COVERED.has(a.slug));
-mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && Boolean(civil));
+mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && list.length === 6 && Boolean(civil));
 
 // match matched
+let matchedLawyerId: string | undefined;
 if (civil) {
   const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [civil.id] }) });
-  const b = m.body as { status?: string; lawyer?: { city?: string }; distanceKm?: number };
+  const b = m.body as { status?: string; lawyer?: { id?: string; city?: string }; distanceKm?: number };
+  matchedLawyerId = b?.lawyer?.id;
   mark({ step: "POST /v1/match SP/civil", status: m.status, matchStatus: b?.status, city: b?.lawyer?.city, distanceKm: b?.distanceKm }, m.status === 200 && b?.status === "matched");
 }
+
+// lawyer profile no token
+const profileNoTok = await call(`/v1/lawyers/${matchedLawyerId ?? "perfil-indisponivel"}`);
+mark({ step: "GET /v1/lawyers/:id sem token", status: profileNoTok.status }, profileNoTok.status === 401);
+
+// lawyer profile public allowlist
+if (matchedLawyerId) {
+  const profile = await call(`/v1/lawyers/${matchedLawyerId}`, { headers: clientH });
+  const lawyer = (profile.body as { lawyer?: Record<string, unknown> })?.lawyer;
+  const unexpectedFields = lawyer ? Object.keys(lawyer).filter((key) => !PUBLIC_PROFILE_KEYS.has(key)) : ["lawyer"];
+  const areas = Array.isArray(lawyer?.areas) ? lawyer.areas as Array<Record<string, unknown>> : [];
+  const unexpectedAreaFields = areas.flatMap((area) => Object.keys(area).filter((key) => !PUBLIC_AREA_KEYS.has(key)));
+  const profileOk = profile.status === 200 && lawyer?.verified === true && areas.length > 0 && unexpectedFields.length === 0 && unexpectedAreaFields.length === 0;
+  mark({
+    step: "GET /v1/lawyers/:id perfil publico",
+    status: profile.status,
+    verified: lawyer?.verified ?? null,
+    areasCount: areas.length,
+    hasForbiddenField: unexpectedFields.length > 0 || unexpectedAreaFields.length > 0
+  }, profileOk);
+} else {
+  mark({ step: "GET /v1/lawyers/:id perfil publico", skipped: true, reason: "match sem lawyer.id" }, false);
+}
+
 // match empty
 if (uncovered) {
   const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [uncovered.id] }) });

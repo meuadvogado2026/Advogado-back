@@ -27,12 +27,32 @@ const matchEmpty = await app.inject({
   headers: CLIENT,
   payload: { lat: -23.55052, lng: -46.633308, accuracyM: 25, areaIds: ["criminal"] }
 });
+const lawyerProfileNoToken = await app.inject({ method: "GET", url: "/v1/lawyers/fixture-lawyer-sp" });
+const lawyerProfileForbidden = await app.inject({
+  method: "GET",
+  url: "/v1/lawyers/fixture-lawyer-sp",
+  headers: { authorization: "Bearer test-lawyer-token" }
+});
+const lawyerProfileUnavailable = await app.inject({
+  method: "GET",
+  url: "/v1/lawyers/fixture-lawyer-pending",
+  headers: CLIENT
+});
+const lawyerProfileApproved = await app.inject({
+  method: "GET",
+  url: "/v1/lawyers/fixture-lawyer-sp",
+  headers: CLIENT
+});
 const adminWithoutToken = await app.inject({ method: "GET", url: "/v1/admin/lawyers" });
 
 await app.close();
 
 const matchedOk = matchMatched.statusCode === 200 && matchMatched.json().status === "matched";
 const emptyOk = matchEmpty.statusCode === 200 && matchEmpty.json().status === "empty";
+const lawyerProfileOk =
+  lawyerProfileApproved.statusCode === 200 &&
+  lawyerProfileApproved.json().lawyer?.verified === true &&
+  lawyerProfileApproved.json().lawyer?.officeCep === undefined;
 
 if (
   health.statusCode !== 200 ||
@@ -40,16 +60,23 @@ if (
   matchNoToken.statusCode !== 401 ||
   !matchedOk ||
   !emptyOk ||
+  lawyerProfileNoToken.statusCode !== 401 ||
+  lawyerProfileForbidden.statusCode !== 403 ||
+  lawyerProfileUnavailable.statusCode !== 404 ||
+  !lawyerProfileOk ||
   adminWithoutToken.statusCode !== 401
 ) {
   throw new Error(
     `Smoke falhou: health=${health.statusCode}, areas=${areas.statusCode}, ` +
       `matchNoToken=${matchNoToken.statusCode}, matched=${matchMatched.statusCode}/${matchMatched.json().status}, ` +
-      `empty=${matchEmpty.statusCode}/${matchEmpty.json().status}, admin401=${adminWithoutToken.statusCode}`
+      `empty=${matchEmpty.statusCode}/${matchEmpty.json().status}, ` +
+      `lawyerProfile=${lawyerProfileNoToken.statusCode}/${lawyerProfileForbidden.statusCode}/${lawyerProfileUnavailable.statusCode}/${lawyerProfileApproved.statusCode}, ` +
+      `admin401=${adminWithoutToken.statusCode}`
   );
 }
 
 console.log(
   `Smoke backend OK: /health, /v1/areas, match sem token=401, ` +
-    `matched (${matchMatched.json().distanceKm}km) e empty validados, admin sem token=401.`
+    `matched (${matchMatched.json().distanceKm}km) e empty validados, ` +
+    `perfil advogado 401/403/404/200, admin sem token=401.`
 );

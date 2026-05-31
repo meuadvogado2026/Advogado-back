@@ -23,6 +23,7 @@ const envSchema = z.object({
   SUPABASE_DB_URL: z.string().optional(),
   TEST_AUTH_ADMIN_TOKEN: z.string().default("test-admin-token"),
   TEST_AUTH_CLIENT_TOKEN: z.string().default("test-client-token"),
+  TEST_AUTH_LAWYER_TOKEN: z.string().default("test-lawyer-token"),
   APPLY_REMOTE_MIGRATIONS: z.enum(["true", "false"]).default("false"),
   MIGRATION_CONFIRMATION: z.string().optional(),
   GEOCODING_PROVIDER: z.enum(["nominatim", "stub"]).default("stub"),
