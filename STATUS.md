@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-05-31  
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 004 ENDPOINT CLIENTE IMPLEMENTADO LOCALMENTE
-**Veredito:** OK_COM_RESSALVAS
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 004 ENDPOINT CLIENTE PUBLICADO
+**Veredito:** OK
 
 ## Producao (Railway)
 
@@ -10,7 +10,7 @@
 - Deploy via GitHub `meuadvogado2026/Advogado-back` (branch `main`), redeploy automatico a cada push.
 - Node 22 exigido (`engines`/`.nvmrc`): supabase-js/realtime quebra em Node 20 por falta de WebSocket nativo.
 - `PORT=8080` fixada nas Variables; demais envs (NODE_ENV=production, SUPABASE_URL/ANON/SERVICE_ROLE, GEOCODING_PROVIDER=nominatim) setadas no painel.
-- Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, /v1/areas 200, match SP/civil matched 0km, SP/criminal empty, sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200; match_events do smoke limpos.
+- Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, 6 areas, match SP/civil matched 0km, perfil cliente 200 com allowlist segura, perfil sem token 401, SP/criminal empty, match sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200; match_events do smoke limpos.
 
 ## Concluido
 
@@ -71,6 +71,7 @@
 - [x] UI do formulario admin consumindo `POST /v1/admin/geocode/cep` (task 6 da spec 002), validada e2e com token admin real (`scripts/admin-form-smoke.ts`): geocode 200, list 200 `persistence=supabase`, create 201 + limpeza via service role, sem residuo.
 - [x] Implementar `GET /v1/lawyers/:id` com allowlist cliente segura conforme spec 004.
 - [x] Validar `GET /v1/lawyers/:id` com TDD `401`, `403`, `404`, `200`, Harness backend e smoke Supabase real sem campos proibidos.
+- [x] Publicar `GET /v1/lawyers/:id` na Railway e validar por HTTP real com token cliente, allowlist estrita e limpeza de eventos.
 - [ ] Definir TTL/anonimizacao de `match_events.client_location` (retencao LGPD sugerida: 90 dias).
 
 ## Bloqueios
@@ -82,4 +83,4 @@
 
 ## Proximo Passo
 
-Endpoint cliente da spec 004 implementado e validado localmente/Supabase real sem migration. Proxima perna: implementar a navegacao mobile `Home -> Perfil -> WhatsApp`. Antes de consumir o endpoint em producao Railway, publicar o diff backend e executar smoke pos-deploy.
+Endpoint cliente da spec 004 implementado, publicado e validado por HTTP real na Railway sem migration. Proxima perna: implementar a navegacao mobile `Home -> Perfil -> WhatsApp`.
