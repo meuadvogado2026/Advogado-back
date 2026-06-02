@@ -43,6 +43,8 @@
 - [x] Checagem publica Railway sem credenciais executada antes do redeploy para admin producao: `/health` `200`, `/v1/areas` `200`, `/v1/admin/lawyers` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, mas `GET /v1/me` retornou `404`.
 - [x] Commit backend `e621676` publicado no GitHub/Railway com `GET /v1/me` e fallback CORS de producao no codigo.
 - [x] Rechecagem publica pos-publicacao: `/health` `200`, `/v1/areas` `200`, `/v1/me` sem token `401`; preflights de `/v1/me`, `/v1/admin/geocode/cep` e `/v1/admin/lawyers` `204`.
+- [x] Commit backend `844c048` publicado no GitHub/Railway para garantir CORS da origem admin Vercel mesmo quando `CORS_ORIGINS` remoto sobrescreve o padrao.
+- [x] Rechecagem publica pos-fix CORS: `/v1/areas`, `/v1/me`, `/v1/admin/geocode/cep` e `/v1/admin/lawyers` retornam `Access-Control-Allow-Origin` para `https://advogado20admin.vercel.app`.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -86,7 +88,7 @@
 
 - Spec 006 admin login/sessao foi validada com smoke admin real local; para operar contra producao/Railway, repetir smoke proporcional no ambiente publicado.
 - Backend Railway publicado agora contem `GET /v1/me` da spec 006 e retorna `401` sem token, como esperado.
-- CORS para `https://advogado20admin.vercel.app` ainda nao retornou `Access-Control-Allow-Origin` nos checks sem credencial; provavel `CORS_ORIGINS` remoto sobrescrevendo o fallback do codigo. Railway CLI esta com sessao expirada/sem projeto linkado nesta maquina.
+- CORS para `https://advogado20admin.vercel.app` esta validado em producao apos commit `844c048`; a lacuna restante do admin publicado e a env Vercel `VITE_SUPABASE_ANON_KEY` ausente no bundle e credencial admin real para smoke assistido.
 - Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
@@ -94,4 +96,4 @@
 
 ## Proximo Passo
 
-Backend/admin producao estao `QUESTIONAR_ENV_ADMIN_PRODUCAO`. Proximo ciclo backend recomendado: configurar `CORS_ORIGINS` no Railway incluindo `https://advogado20admin.vercel.app`, redeployar se necessario e repetir smoke Vercel/Railway com credencial admin real redigida.
+Backend Railway esta OK para o gate CORS do admin publicado. Admin producao permanece `QUESTIONAR_ENV_ADMIN_PRODUCAO` ate configurar `VITE_SUPABASE_ANON_KEY` na Vercel e repetir smoke Vercel/Railway com credencial admin real redigida.
