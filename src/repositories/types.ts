@@ -7,6 +7,15 @@ export type Profile = {
   name: string;
   email: string;
   phone?: string | null;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+};
+
+export type LawyerVisualFields = {
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  miniBio?: string | null;
+  fullBio?: string | null;
 };
 
 export type LegalSpecialty = {
@@ -30,7 +39,8 @@ export type LawyerCoordinates = { lat: number; lng: number };
 
 export interface ProfileRepository {
   getById(id: string): Promise<Profile | null>;
-  createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp">): Promise<Profile>;
+  createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile>;
+  updateVisualFields(profileId: string, input: Pick<LawyerVisualFields, "avatarUrl" | "coverUrl">): Promise<void>;
 }
 
 export interface LegalSpecialtyRepository {
@@ -56,6 +66,13 @@ export type PublicLawyerProfile = {
   areas: Array<{ id: string; name: string }>;
   whatsapp: string;
   verified: true;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  miniBio?: string | null;
+  fullBio?: string | null;
+  yearsExperience?: number | null;
+  planLabel?: string | null;
+  emergencyAvailable?: boolean;
 };
 
 export interface PublicLawyerProfileRepository {

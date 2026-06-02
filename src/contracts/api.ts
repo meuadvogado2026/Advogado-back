@@ -13,6 +13,18 @@ export const matchRequestSchema = z.object({
   areaIds: z.array(z.string()).min(1)
 });
 
+const safeHttpsUrlSchema = z.preprocess((value) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" ? trimmed : null;
+  } catch {
+    return null;
+  }
+}, z.string().url().nullable());
+
 export const lawyerCreateSchema = z.object({
   name: z.string().min(3),
   email: z.string().email(),
@@ -23,6 +35,10 @@ export const lawyerCreateSchema = z.object({
   secondaryAreaIds: z.array(z.string()).default([]),
   officeCep: z.string().regex(/^\d{5}-?\d{3}$/),
   officeNumber: z.string().min(1),
+  avatarUrl: safeHttpsUrlSchema.optional(),
+  coverUrl: safeHttpsUrlSchema.optional(),
+  miniBio: z.string().trim().max(240).nullable().optional(),
+  fullBio: z.string().trim().max(1200).nullable().optional(),
   status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).default("draft")
 });
 

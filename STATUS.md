@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-02
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / ADMIN PRODUCAO QUESTIONAR ENV
-**Veredito:** QUESTIONAR_ENV_ADMIN_PRODUCAO
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 008 PARTE 2 LOCAL IMPLEMENTADA
+**Veredito:** SPEC008_PARTE2_LOCAL_OK_COM_RESSALVAS
 
 ## Producao (Railway)
 
@@ -45,6 +45,10 @@
 - [x] Rechecagem publica pos-publicacao: `/health` `200`, `/v1/areas` `200`, `/v1/me` sem token `401`; preflights de `/v1/me`, `/v1/admin/geocode/cep` e `/v1/admin/lawyers` `204`.
 - [x] Commit backend `844c048` publicado no GitHub/Railway para garantir CORS da origem admin Vercel mesmo quando `CORS_ORIGINS` remoto sobrescreve o padrao.
 - [x] Rechecagem publica pos-fix CORS: `/v1/areas`, `/v1/me`, `/v1/admin/geocode/cep` e `/v1/admin/lawyers` retornam `Access-Control-Allow-Origin` para `https://advogado20admin.vercel.app`.
+- [x] Revalidacao publica pos-env admin Vercel: `/v1/areas` `200`, `/v1/me` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, `POST /v1/admin/lawyers` sem token `401` e preflights `204`, todos com CORS para `https://advogado20admin.vercel.app`.
+- [x] Smoke autenticado do admin publicado validou backend Railway para `POST /v1/admin/geocode/cep` e `POST /v1/admin/lawyers`; cadastro descartavel foi limpo via service role local e verificacao final ficou sem residuo.
+- [x] Spec 008 Parte 2 implementada localmente: `GET /v1/lawyers/:id` ganhou campos opcionais `avatarUrl`, `coverUrl`, `miniBio`, `fullBio`, `yearsExperience`, `planLabel` e `emergencyAvailable` sem quebrar contrato; URLs visuais inseguras/invalidas viram `null`.
+- [x] Allowlist publica revalidada: perfil segue sem CEP, endereco completo, coordenada, email interno, status administrativo ou auditoria. Testes cobrem `401`, `403`, `404`, `200` e URL insegura normalizada.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -88,7 +92,7 @@
 
 - Spec 006 admin login/sessao foi validada com smoke admin real local; para operar contra producao/Railway, repetir smoke proporcional no ambiente publicado.
 - Backend Railway publicado agora contem `GET /v1/me` da spec 006 e retorna `401` sem token, como esperado.
-- CORS para `https://advogado20admin.vercel.app` esta validado em producao apos commit `844c048`; a lacuna restante do admin publicado e a env Vercel `VITE_SUPABASE_ANON_KEY` ausente no bundle e credencial admin real para smoke assistido.
+- CORS para `https://advogado20admin.vercel.app` esta validado em producao apos commit `844c048`; o smoke autenticado do admin publicado fechou com limpeza. Negativo nao-admin publicado segue pendente apenas se houver credencial segura desse perfil.
 - Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
@@ -96,4 +100,4 @@
 
 ## Proximo Passo
 
-Backend Railway esta OK para o gate CORS do admin publicado. Admin producao permanece `QUESTIONAR_ENV_ADMIN_PRODUCAO` ate configurar `VITE_SUPABASE_ANON_KEY` na Vercel e repetir smoke Vercel/Railway com credencial admin real redigida.
+Parte 2 da spec 008 esta localmente OK. Proximo gate backend: publicar o contrato visual na Railway quando aprovado e repetir `prod:smoke`/smoke de perfil com campos visuais reais; apply destrutivo da spec 007 segue independente e somente com janela aprovada.

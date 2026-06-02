@@ -184,9 +184,45 @@ describe("foundation API", () => {
           { id: "consumidor", name: "Direito do Consumidor" }
         ],
         whatsapp: "11988887777",
-        verified: true
+        verified: true,
+        avatarUrl: "https://example.test/ana-avatar.jpg",
+        coverUrl: "https://example.test/ana-cover.jpg",
+        miniBio: "Atuacao consultiva em direito civil.",
+        fullBio: "Perfil profissional aprovado para testes de contrato publico seguro.",
+        yearsExperience: null,
+        planLabel: null,
+        emergencyAvailable: false
       }
     });
+    expect(response.json().lawyer.officeCep).toBeUndefined();
+    expect(response.json().lawyer.email).toBeUndefined();
+    expect(response.json().lawyer.officeLat).toBeUndefined();
+  });
+
+  it("normalizes insecure image URLs on admin lawyer create", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyers",
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Url Insegura",
+        email: "insecure-url@example.test",
+        whatsapp: "11955554444",
+        oabNumber: "778899",
+        oabState: "SP",
+        mainAreaId: "civil",
+        secondaryAreaIds: [],
+        officeCep: "01001-000",
+        officeNumber: "200",
+        avatarUrl: "http://example.test/avatar.jpg",
+        status: "draft"
+      }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().lawyer.avatarUrl).toBeNull();
   });
 
   it("keeps areas public", async () => {

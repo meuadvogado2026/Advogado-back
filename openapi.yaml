@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Meu Advogado 2.0 API
-  version: 0.4.0-client-lawyer-profile
+  version: 0.5.0-lawyer-profile-visuals
 servers:
   - url: http://localhost:3333
 paths:
@@ -106,6 +106,22 @@ paths:
                       verified:
                         type: boolean
                         const: true
+                      avatarUrl:
+                        type: [string, "null"]
+                        format: uri
+                      coverUrl:
+                        type: [string, "null"]
+                        format: uri
+                      miniBio:
+                        type: [string, "null"]
+                      fullBio:
+                        type: [string, "null"]
+                      yearsExperience:
+                        type: [integer, "null"]
+                      planLabel:
+                        type: [string, "null"]
+                      emergencyAvailable:
+                        type: boolean
         "401":
           description: Token ausente ou invalido
         "403":

@@ -78,7 +78,7 @@ Regras:
 - Evento gravado em `match_events`; coordenada vai para o banco, nunca para logs.
 - Spec 007 implementa a politica alvo de retencao: expurgo integral de eventos antigos apos 90 dias no MVP via `npm run retention:match-events`, com dry-run padrao e apply bloqueado por confirmacao explicita.
 
-## GET /v1/lawyers/:id (spec 004)
+## GET /v1/lawyers/:id (spec 004, ampliado na spec 008 Parte 2)
 
 Requer `Authorization: Bearer <token>` (`client` ou `admin`). Retorna somente advogado
 aprovado para cliente e responde `404` seguro quando o perfil nao existe ou nao esta
@@ -98,14 +98,23 @@ Resposta `200`:
     "areaIds": ["..."],
     "areas": [{ "id": "...", "name": "Direito Civil" }],
     "whatsapp": "...",
-    "verified": true
+    "verified": true,
+    "avatarUrl": "https://cdn.example.com/avatar.jpg",
+    "coverUrl": "https://cdn.example.com/capa.jpg",
+    "miniBio": "Atendimento consultivo em direito civil.",
+    "fullBio": "Texto publico do perfil profissional.",
+    "yearsExperience": null,
+    "planLabel": null,
+    "emergencyAvailable": false
   }
 }
 ```
 
-Nao expor CEP, endereco completo, coordenada, `office_location`, email, auditoria ou
-status interno. A distancia nao pertence a esta resposta: quando houver match, segue
-como contexto efemero da navegacao mobile.
+Campos visuais sao opcionais/aditivos. `avatarUrl` e `coverUrl` aceitam apenas HTTPS;
+valor ausente, inseguro ou invalido deve virar `null`/fallback. Nao expor CEP, endereco
+completo, coordenada, `office_location`, email, auditoria ou status interno. A distancia
+nao pertence a esta resposta: quando houver match, segue como contexto efemero da
+navegacao mobile.
 
 ## Padrao De Erro
 

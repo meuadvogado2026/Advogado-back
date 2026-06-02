@@ -30,26 +30,76 @@ class SupabaseProfileRepository implements ProfileRepository {
   async getById(id: string): Promise<Profile | null> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, role, name, email, phone")
+      .select("id, role, name, email, phone, avatar_url, cover_url")
       .eq("id", id)
       .maybeSingle();
     assertSupabaseOk(error, "profiles.getById");
-    return data as Profile | null;
+    if (!data) return null;
+    const row = data as {
+      id: string;
+      role: Profile["role"];
+      name: string;
+      email: string;
+      phone: string | null;
+      avatar_url: string | null;
+      cover_url: string | null;
+    };
+    return {
+      id: row.id,
+      role: row.role,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      avatarUrl: row.avatar_url,
+      coverUrl: row.cover_url
+    };
   }
 
-  async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp">): Promise<Profile> {
+  async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile> {
     const { data, error } = await this.supabase
       .from("profiles")
       .insert({
         role: "lawyer",
         name: input.name,
         email: input.email,
-        phone: input.whatsapp
+        phone: input.whatsapp,
+        avatar_url: input.avatarUrl ?? null,
+        cover_url: input.coverUrl ?? null
       })
-      .select("id, role, name, email, phone")
+      .select("id, role, name, email, phone, avatar_url, cover_url")
       .single();
     assertSupabaseOk(error, "profiles.createLawyerProfile");
-    return data as Profile;
+    const row = data as {
+      id: string;
+      role: Profile["role"];
+      name: string;
+      email: string;
+      phone: string | null;
+      avatar_url: string | null;
+      cover_url: string | null;
+    };
+    return {
+      id: row.id,
+      role: row.role,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      avatarUrl: row.avatar_url,
+      coverUrl: row.cover_url
+    };
+  }
+
+  async updateVisualFields(profileId: string, input: Pick<Profile, "avatarUrl" | "coverUrl">): Promise<void> {
+    const payload: Record<string, string | null> = {};
+    if (input.avatarUrl !== undefined) payload.avatar_url = input.avatarUrl ?? null;
+    if (input.coverUrl !== undefined) payload.cover_url = input.coverUrl ?? null;
+    if (Object.keys(payload).length === 0) return;
+
+    const { error } = await this.supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", profileId);
+    assertSupabaseOk(error, "profiles.updateVisualFields");
   }
 }
 
@@ -69,7 +119,7 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 // Inclui office_lat/office_lng para refletir a coordenada persistida no escritorio.
 const LAWYER_COLUMNS =
-  "id, profile_id, status, oab_number, oab_state, whatsapp, office_cep, office_number, office_lat, office_lng, created_at, updated_at";
+  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, office_cep, office_number, office_lat, office_lng, created_at, updated_at";
 
 type LawyerRow = {
   id: string;
@@ -78,6 +128,8 @@ type LawyerRow = {
   oab_number: string;
   oab_state: string;
   whatsapp: string;
+  mini_bio: string | null;
+  full_bio: string | null;
   office_cep: string;
   office_number: string;
   office_lat: number | string | null;
@@ -110,6 +162,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
       name: "",
       email: "",
       whatsapp: row.whatsapp,
+      miniBio: row.mini_bio,
+      fullBio: row.full_bio,
       oabNumber: row.oab_number,
       oabState: row.oab_state,
       mainAreaId: "",
@@ -154,6 +208,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
       oab_number: input.oabNumber,
       oab_state: input.oabState.toUpperCase(),
       whatsapp: input.whatsapp,
+      mini_bio: input.miniBio ?? null,
+      full_bio: input.fullBio ?? null,
       office_cep: input.officeCep.replace(/\D/g, ""),
       office_number: input.officeNumber
     };
@@ -187,6 +243,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
     if (patch.oabNumber) updatePayload.oab_number = patch.oabNumber;
     if (patch.oabState) updatePayload.oab_state = patch.oabState.toUpperCase();
     if (patch.whatsapp) updatePayload.whatsapp = patch.whatsapp;
+    if (patch.miniBio !== undefined) updatePayload.mini_bio = patch.miniBio;
+    if (patch.fullBio !== undefined) updatePayload.full_bio = patch.fullBio;
     if (patch.officeCep) updatePayload.office_cep = patch.officeCep.replace(/\D/g, "");
     if (patch.officeNumber) updatePayload.office_number = patch.officeNumber;
     if (coordinates) {
@@ -203,6 +261,12 @@ class SupabaseLawyerRepository implements LawyerRepository {
       .maybeSingle();
     assertSupabaseOk(error, "lawyer_profiles.update");
     if (!data) return null;
+    if (patch.avatarUrl !== undefined || patch.coverUrl !== undefined) {
+      await this.profiles.updateVisualFields((data as LawyerRow).profile_id, {
+        avatarUrl: patch.avatarUrl,
+        coverUrl: patch.coverUrl
+      });
+    }
 
     return this.mapRow(data as LawyerRow, {
       name: patch.name ?? "",
@@ -218,9 +282,11 @@ type PublicLawyerProfileRow = {
   oab_number: string;
   oab_state: string;
   whatsapp: string;
+  mini_bio: string | null;
+  full_bio: string | null;
   office_city: string | null;
   office_state: string | null;
-  profiles: { name: string } | Array<{ name: string }>;
+  profiles: { name: string; avatar_url: string | null; cover_url: string | null } | Array<{ name: string; avatar_url: string | null; cover_url: string | null }>;
   lawyer_specialties: Array<{
     specialty_id: string;
     legal_specialties: { id: string; name: string } | Array<{ id: string; name: string }>;
@@ -242,7 +308,7 @@ class SupabasePublicLawyerProfileRepository implements PublicLawyerProfileReposi
     const { data, error } = await this.supabase
       .from("lawyer_profiles")
       .select(
-        "id, oab_number, oab_state, whatsapp, office_city, office_state, profiles!inner(name), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
+        "id, oab_number, oab_state, whatsapp, mini_bio, full_bio, office_city, office_state, profiles!inner(name, avatar_url, cover_url), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
       )
       .eq("id", id)
       .eq("status", "approved")
@@ -263,7 +329,14 @@ class SupabasePublicLawyerProfileRepository implements PublicLawyerProfileReposi
       areaIds: areas.map((area) => area.id),
       areas,
       whatsapp: row.whatsapp,
-      verified: true
+      verified: true,
+      avatarUrl: profile.avatar_url,
+      coverUrl: profile.cover_url,
+      miniBio: row.mini_bio,
+      fullBio: row.full_bio,
+      yearsExperience: null,
+      planLabel: null,
+      emergencyAvailable: false
     };
   }
 }

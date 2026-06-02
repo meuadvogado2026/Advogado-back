@@ -49,6 +49,13 @@ As rotas admin agora exigem Bearer token e role `admin`. A service role key deve
 
 `GET /v1/me` retorna somente `id`, `email` e `role` do usuario autenticado. O painel admin usa esse contrato para validar role antes de liberar a operacao. Senha nao passa pelo backend neste fluxo; o login usa Supabase Auth REST com anon key publica no admin e todas as regras de negocio continuam protegidas pelo backend.
 
+## Spec 008 Parte 2 - Perfil Visual Publico
+
+`GET /v1/lawyers/:id` pode retornar `avatarUrl`, `coverUrl`, `miniBio` e `fullBio`
+somente pela allowlist publica. URLs de imagem aceitam apenas HTTPS; URL ausente,
+invalida ou insegura vira `null`/fallback. O contrato continua sem CEP, endereco
+completo, coordenada exata, email interno, status administrativo ou auditoria.
+
 ## Migration Controlada
 
 `npm run migration:check` valida a migration sem aplicar remotamente, mesmo se a env tiver flags de aplicacao. Aplicacao remota so e tentada com `npm run migration:apply`, `APPLY_REMOTE_MIGRATIONS=true`, `SUPABASE_DB_URL` configurado e `MIGRATION_CONFIRMATION=APPLY_MEU_ADVOGADO_20_FOUNDATION`.

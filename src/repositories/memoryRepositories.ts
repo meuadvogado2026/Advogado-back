@@ -36,16 +36,28 @@ class MemoryProfileRepository implements ProfileRepository {
     return profiles.get(id) ?? null;
   }
 
-  async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp">) {
+  async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">) {
     const profile: Profile = {
       id: crypto.randomUUID(),
       role: "lawyer",
       name: input.name,
       email: input.email,
-      phone: input.whatsapp
+      phone: input.whatsapp,
+      avatarUrl: input.avatarUrl ?? null,
+      coverUrl: input.coverUrl ?? null
     };
     profiles.set(profile.id, profile);
     return profile;
+  }
+
+  async updateVisualFields(profileId: string, input: Pick<Profile, "avatarUrl" | "coverUrl">) {
+    const existing = profiles.get(profileId);
+    if (!existing) return;
+    profiles.set(profileId, {
+      ...existing,
+      ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl ?? null } : {}),
+      ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl ?? null } : {})
+    });
   }
 }
 
@@ -115,6 +127,10 @@ type MatchFixture = {
   status: LawyerRecord["status"];
   oabNumber: string;
   oabState: string;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  miniBio?: string | null;
+  fullBio?: string | null;
 };
 
 /**
@@ -134,7 +150,11 @@ const matchFixtures: MatchFixture[] = [
     areaIds: ["civil", "consumidor"],
     status: "approved",
     oabNumber: "654321",
-    oabState: "SP"
+    oabState: "SP",
+    avatarUrl: "https://example.test/ana-avatar.jpg",
+    coverUrl: "https://example.test/ana-cover.jpg",
+    miniBio: "Atuacao consultiva em direito civil.",
+    fullBio: "Perfil profissional aprovado para testes de contrato publico seguro."
   },
   {
     id: "fixture-lawyer-rj",
@@ -225,7 +245,14 @@ class MemoryPublicLawyerProfileRepository implements PublicLawyerProfileReposito
         name: legalAreas.find((area) => area.id === areaId)?.name ?? areaId
       })),
       whatsapp: fixture.whatsapp,
-      verified: true as const
+      verified: true as const,
+      avatarUrl: fixture.avatarUrl ?? null,
+      coverUrl: fixture.coverUrl ?? null,
+      miniBio: fixture.miniBio ?? null,
+      fullBio: fixture.fullBio ?? null,
+      yearsExperience: null,
+      planLabel: null,
+      emergencyAvailable: false
     };
   }
 }
