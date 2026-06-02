@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-02
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 008 PARTE 2 LOCAL IMPLEMENTADA
-**Veredito:** SPEC008_PARTE2_LOCAL_OK_COM_RESSALVAS
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 008 PARTE 2 PUBLICACAO BLOQUEADA
+**Veredito:** QUESTIONAR_PUBLICACAO_GITHUB_403
 
 ## Producao (Railway)
 
@@ -11,6 +11,7 @@
 - Node 22 exigido (`engines`/`.nvmrc`): supabase-js/realtime quebra em Node 20 por falta de WebSocket nativo.
 - `PORT=8080` fixada nas Variables; demais envs (NODE_ENV=production, SUPABASE_URL/ANON/SERVICE_ROLE, GEOCODING_PROVIDER=nominatim) setadas no painel.
 - Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, 6 areas, match SP/civil matched 0km, perfil cliente 200 com allowlist segura, perfil sem token 401, SP/criminal empty, match sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200; match_events do smoke limpos.
+- Publicacao da Parte 2 ainda nao chegou na Railway: commit local `80f7a8e` aguardando push; `git push origin main` falhou com GitHub `403` para `israelcknegocios`.
 
 ## Concluido
 
@@ -100,4 +101,4 @@
 
 ## Proximo Passo
 
-Parte 2 da spec 008 esta localmente OK. Proximo gate backend: publicar o contrato visual na Railway quando aprovado e repetir `prod:smoke`/smoke de perfil com campos visuais reais; apply destrutivo da spec 007 segue independente e somente com janela aprovada.
+Parte 2 da spec 008 esta validada localmente, mas bloqueada para publicacao por GitHub `403`. Proximo gate backend: corrigir permissao/credencial de push, publicar `80f7a8e` na Railway e repetir `prod:smoke`/smoke de perfil com campos visuais reais; apply destrutivo da spec 007 segue independente e somente com janela aprovada.
