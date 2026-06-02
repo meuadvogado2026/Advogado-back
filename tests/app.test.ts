@@ -29,6 +29,29 @@ describe("foundation API", () => {
     expect(response.json()).toMatchObject({ status: "ok", service: "meu-advogado-20-back" });
   });
 
+  it("always allows the published Vercel admin origin even when CORS_ORIGINS is overridden", async () => {
+    const previousCorsOrigins = process.env.CORS_ORIGINS;
+    process.env.CORS_ORIGINS = "http://localhost:5173";
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/areas",
+      headers: {
+        origin: "https://advogado20admin.vercel.app",
+        "access-control-request-method": "GET"
+      }
+    });
+    await app.close();
+    if (previousCorsOrigins === undefined) {
+      delete process.env.CORS_ORIGINS;
+    } else {
+      process.env.CORS_ORIGINS = previousCorsOrigins;
+    }
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://advogado20admin.vercel.app");
+  });
+
   it("requires auth on match", async () => {
     const app = await buildApp();
     const response = await app.inject({ method: "POST", url: "/v1/match", payload: { lat: 200 } });

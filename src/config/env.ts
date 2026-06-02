@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 
+const REQUIRED_CORS_ORIGINS = ["https://advogado20admin.vercel.app"];
+
 const workspaceEnvPath = resolve(process.cwd(), "..", ".env");
 const localEnvPath = resolve(process.cwd(), ".env");
 
@@ -38,4 +40,16 @@ export type AppEnv = z.infer<typeof envSchema>;
 
 export function loadEnv(source = process.env): AppEnv {
   return envSchema.parse(source);
+}
+
+export function resolveCorsOrigins(corsOrigins: string): string[] {
+  return Array.from(
+    new Set([
+      ...corsOrigins
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+      ...REQUIRED_CORS_ORIGINS
+    ])
+  );
 }

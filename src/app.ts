@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
-import { loadEnv } from "./config/env.js";
+import { loadEnv, resolveCorsOrigins } from "./config/env.js";
 import { registerAdminLawyerRoutes } from "./modules/adminLawyers/routes.js";
 import { registerAreaRoutes } from "./modules/areas/routes.js";
 import { registerAuthRoutes } from "./modules/auth/routes.js";
@@ -18,7 +18,7 @@ export async function buildApp() {
   });
 
   await app.register(cors, {
-    origin: env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
+    origin: resolveCorsOrigins(env.CORS_ORIGINS)
   });
   await app.register(rateLimit, {
     max: 100,
