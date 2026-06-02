@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-02
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / ADMIN PRODUCAO QUESTIONAR
-**Veredito:** QUESTIONAR_DEPLOY_ADMIN_PRODUCAO
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / ADMIN PRODUCAO QUESTIONAR ENV
+**Veredito:** QUESTIONAR_ENV_ADMIN_PRODUCAO
 
 ## Producao (Railway)
 
@@ -40,7 +40,9 @@
 - [x] Ambiente backend passou a ser governado pela `.codex/` unica da raiz; copia local `Meu Advogado 2.0 - back/.codex` removida.
 - [x] Spec 006: `GET /v1/me` implementado para retornar identidade/role segura (`id`, `email`, `role`) sem token/service role/payload sensivel.
 - [x] Spec 007: mecanismo backend de retencao de `match_events` implementado com comando `npm run retention:match-events`, dry-run padrao, retencao de 90 dias e apply bloqueado por confirmacao explicita.
-- [x] Checagem publica Railway sem credenciais executada para admin producao: `/health` `200`, `/v1/areas` `200`, `/v1/admin/lawyers` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, mas `GET /v1/me` retornou `404`.
+- [x] Checagem publica Railway sem credenciais executada antes do redeploy para admin producao: `/health` `200`, `/v1/areas` `200`, `/v1/admin/lawyers` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, mas `GET /v1/me` retornou `404`.
+- [x] Commit backend `e621676` publicado no GitHub/Railway com `GET /v1/me` e fallback CORS de producao no codigo.
+- [x] Rechecagem publica pos-publicacao: `/health` `200`, `/v1/areas` `200`, `/v1/me` sem token `401`; preflights de `/v1/me`, `/v1/admin/geocode/cep` e `/v1/admin/lawyers` `204`.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -83,8 +85,8 @@
 ## Bloqueios
 
 - Spec 006 admin login/sessao foi validada com smoke admin real local; para operar contra producao/Railway, repetir smoke proporcional no ambiente publicado.
-- Backend Railway publicado ainda nao contem `GET /v1/me` da spec 006 ou nao esta no deploy esperado; admin Vercel tambem aponta para backend local.
-- CORS para `https://advogado20admin.vercel.app` nao retornou `Access-Control-Allow-Origin` nos checks sem credencial; revalidar apos deploy correto de backend/admin.
+- Backend Railway publicado agora contem `GET /v1/me` da spec 006 e retorna `401` sem token, como esperado.
+- CORS para `https://advogado20admin.vercel.app` ainda nao retornou `Access-Control-Allow-Origin` nos checks sem credencial; provavel `CORS_ORIGINS` remoto sobrescrevendo o fallback do codigo. Railway CLI esta com sessao expirada/sem projeto linkado nesta maquina.
 - Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
@@ -92,4 +94,4 @@
 
 ## Proximo Passo
 
-Backend/admin producao estao `QUESTIONAR_DEPLOY_ADMIN_PRODUCAO`. Proximo ciclo backend recomendado: publicar commit que contem `GET /v1/me` na Railway, garantir CORS para `https://advogado20admin.vercel.app` e repetir smoke Vercel/Railway com credencial admin real redigida.
+Backend/admin producao estao `QUESTIONAR_ENV_ADMIN_PRODUCAO`. Proximo ciclo backend recomendado: configurar `CORS_ORIGINS` no Railway incluindo `https://advogado20admin.vercel.app`, redeployar se necessario e repetir smoke Vercel/Railway com credencial admin real redigida.
