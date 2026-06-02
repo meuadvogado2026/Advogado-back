@@ -32,6 +32,7 @@ Dados sensiveis:
 - Minimizar persistencia de localizacao do cliente.
 - Permitir exclusao/anonimizacao conforme politica.
 - Separar dados operacionais de logs.
+- Spec 007 implementa expurgo integral de `match_events` antigos apos 90 dias no MVP via comando backend. Dry-run nao altera dados; apply destrutivo exige confirmacao explicita e deve rodar somente em ambiente aprovado.
 
 ## Smoke De Seguranca
 
@@ -43,6 +44,10 @@ Dados sensiveis:
 ## Ressalva Da Fundacao
 
 As rotas admin agora exigem Bearer token e role `admin`. A service role key deve existir apenas no backend/Railway e nunca em mobile/admin.
+
+## Spec 006 - Sessao Admin
+
+`GET /v1/me` retorna somente `id`, `email` e `role` do usuario autenticado. O painel admin usa esse contrato para validar role antes de liberar a operacao. Senha nao passa pelo backend neste fluxo; o login usa Supabase Auth REST com anon key publica no admin e todas as regras de negocio continuam protegidas pelo backend.
 
 ## Migration Controlada
 

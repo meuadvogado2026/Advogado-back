@@ -1,7 +1,7 @@
 # Backend Data Model - Meu Advogado 2.0
 
 **Banco:** Supabase Postgres novo  
-**Estado:** draft versionado em migration inicial
+**Estado:** migrations versionadas / spec 007 LGPD implementada com ressalvas
 
 ## Extensoes Recomendadas
 
@@ -67,6 +67,8 @@
 - Advogado sem coordenada valida nao entra no match.
 - Apenas `approved` entra no match.
 - Urgencia deve ter idempotencia.
+- `match_events.client_location` guarda coordenada precisa do cliente para o match atual e deve seguir politica de retencao LGPD da spec 007.
+- Recomendacao MVP da spec 007: expurgo integral de eventos antigos apos 90 dias via `npm run retention:match-events`; dry-run validado, apply remoto ainda nao executado.
 
 ## Migration Inicial
 

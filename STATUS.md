@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
-**Ultima atualizacao:** 2026-05-31  
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 004 ENDPOINT CLIENTE PUBLICADO
-**Veredito:** OK
+**Ultima atualizacao:** 2026-06-02
+**Fase:** BACKEND EM PRODUCAO NA RAILWAY / ADMIN PRODUCAO QUESTIONAR
+**Veredito:** QUESTIONAR_DEPLOY_ADMIN_PRODUCAO
 
 ## Producao (Railway)
 
@@ -38,6 +38,9 @@
 - [x] Smoke JWT real criado e executado com `npm run auth:smoke`.
 - [x] Admin real validado com `200` em rota admin; advogado e cliente validados com `403`.
 - [x] Ambiente backend passou a ser governado pela `.codex/` unica da raiz; copia local `Meu Advogado 2.0 - back/.codex` removida.
+- [x] Spec 006: `GET /v1/me` implementado para retornar identidade/role segura (`id`, `email`, `role`) sem token/service role/payload sensivel.
+- [x] Spec 007: mecanismo backend de retencao de `match_events` implementado com comando `npm run retention:match-events`, dry-run padrao, retencao de 90 dias e apply bloqueado por confirmacao explicita.
+- [x] Checagem publica Railway sem credenciais executada para admin producao: `/health` `200`, `/v1/areas` `200`, `/v1/admin/lawyers` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, mas `GET /v1/me` retornou `404`.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -72,15 +75,21 @@
 - [x] Implementar `GET /v1/lawyers/:id` com allowlist cliente segura conforme spec 004.
 - [x] Validar `GET /v1/lawyers/:id` com TDD `401`, `403`, `404`, `200`, Harness backend e smoke Supabase real sem campos proibidos.
 - [x] Publicar `GET /v1/lawyers/:id` na Railway e validar por HTTP real com token cliente, allowlist estrita e limpeza de eventos.
-- [ ] Definir TTL/anonimizacao de `match_events.client_location` (retencao LGPD sugerida: 90 dias).
+- [x] Spec 007 implementada para TTL/anonimizacao de `match_events.client_location`, com recomendacao MVP de expurgo integral apos 90 dias.
+- [x] Dry-run real de `npm run retention:match-events` passou com `matchedEvents=0`, `deletedEvents=0`, `applied=false`.
+- [ ] Executar apply remoto real da spec 007 somente quando houver janela aprovada e necessidade operacional.
+- [x] Apoiar spec 006 com contrato seguro de perfil/role (`GET /v1/me`) e harness backend exit 0.
 
 ## Bloqueios
 
-- Admin UI ainda nao implementa login completo; mobile ja possui login real validado.
+- Spec 006 admin login/sessao foi validada com smoke admin real local; para operar contra producao/Railway, repetir smoke proporcional no ambiente publicado.
+- Backend Railway publicado ainda nao contem `GET /v1/me` da spec 006 ou nao esta no deploy esperado; admin Vercel tambem aponta para backend local.
+- CORS para `https://advogado20admin.vercel.app` nao retornou `Access-Control-Allow-Origin` nos checks sem credencial; revalidar apos deploy correto de backend/admin.
+- Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 
 ## Proximo Passo
 
-Endpoint cliente da spec 004 implementado, publicado e validado por HTTP real na Railway sem migration. Proxima perna: implementar a navegacao mobile `Home -> Perfil -> WhatsApp`.
+Backend/admin producao estao `QUESTIONAR_DEPLOY_ADMIN_PRODUCAO`. Proximo ciclo backend recomendado: publicar commit que contem `GET /v1/me` na Railway, garantir CORS para `https://advogado20admin.vercel.app` e repetir smoke Vercel/Railway com credencial admin real redigida.

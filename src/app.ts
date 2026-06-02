@@ -4,6 +4,7 @@ import Fastify from "fastify";
 import { loadEnv } from "./config/env.js";
 import { registerAdminLawyerRoutes } from "./modules/adminLawyers/routes.js";
 import { registerAreaRoutes } from "./modules/areas/routes.js";
+import { registerAuthRoutes } from "./modules/auth/routes.js";
 import { registerHealthRoutes } from "./modules/health/routes.js";
 import { registerLawyerProfileRoutes } from "./modules/lawyerProfiles/routes.js";
 import { registerMatchRoutes } from "./modules/match/routes.js";
@@ -28,6 +29,7 @@ export async function buildApp() {
 
   await app.register(async (v1) => {
     await registerAreaRoutes(v1, repositories.legalSpecialties);
+    await registerAuthRoutes(v1, env, repositories);
     await registerMatchRoutes(v1, env, repositories);
     await registerLawyerProfileRoutes(v1, env, repositories);
     await registerAdminLawyerRoutes(v1, env, repositories);

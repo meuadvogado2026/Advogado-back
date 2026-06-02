@@ -175,6 +175,35 @@ describe("foundation API", () => {
     expect(response.json().areas.length).toBeGreaterThan(0);
   });
 
+  it("requires auth on profile session endpoint", async () => {
+    const app = await buildApp();
+    const response = await app.inject({ method: "GET", url: "/v1/me" });
+    await app.close();
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("returns the authenticated user role without sensitive fields", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/me",
+      headers: ADMIN
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      user: {
+        id: "test-admin-user",
+        email: "admin@example.test",
+        role: "admin"
+      }
+    });
+    expect(response.json().user.token).toBeUndefined();
+  });
+
   it("requires auth on admin routes", async () => {
     const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/v1/admin/lawyers" });

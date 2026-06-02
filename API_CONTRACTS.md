@@ -9,7 +9,7 @@
 
 ## Auth/Profile
 
-- `GET /v1/me`
+- `GET /v1/me` - implementado na spec 006 para validar identidade/role sem expor campos sensiveis
 - `PATCH /v1/me`
 
 ## Cliente
@@ -76,6 +76,7 @@ Regras:
 - Ordenado por distancia (PostGIS `ST_Distance`); raio maximo via `MATCH_MAX_RADIUS_KM` (default 200km).
 - `lawyer` expoe apenas campos seguros; nunca CEP/endereco completo nem PII interna.
 - Evento gravado em `match_events`; coordenada vai para o banco, nunca para logs.
+- Spec 007 implementa a politica alvo de retencao: expurgo integral de eventos antigos apos 90 dias no MVP via `npm run retention:match-events`, com dry-run padrao e apply bloqueado por confirmacao explicita.
 
 ## GET /v1/lawyers/:id (spec 004)
 
@@ -118,6 +119,30 @@ como contexto efemero da navegacao mobile.
 }
 ```
 
+## GET /v1/me (spec 006)
+
+Requer `Authorization: Bearer <token>`. Retorna somente identidade minima e role:
+
+```json
+{
+  "user": {
+    "id": "...",
+    "email": "admin@example.com",
+    "role": "admin"
+  }
+}
+```
+
+Sem token -> `401`; token invalido -> `401`; perfil sem role autorizada -> `403`.
+Nao retorna token, service role, dados de perfil completos ou payload sensivel.
+
 ## Observacao Da Fundacao
 
 `POST /v1/match` agora retorna match real geoespacial (PostGIS) via repositorio, com `matched`/`empty` e auth de cliente. Rotas admin de advogados passam por auth/role e usam repositorios. Supabase real depende de env segura + aplicacao manual de `0002_match_nearest.sql` e seed `001_match_fixtures.sql`.
+
+## Spec 006 - Login Admin
+
+O painel admin deve validar sessao/role por contrato backend seguro, preferencialmente
+`GET /v1/me`, retornando no maximo `id`, `email` e `role`. Rotas admin operacionais
+continuam exigindo Bearer token com role `admin`. Nenhuma service role, token completo,
+senha ou payload sensivel deve ser exposto ao admin, logs, docs ou harness.

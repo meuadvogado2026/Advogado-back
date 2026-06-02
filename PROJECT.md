@@ -1,6 +1,6 @@
 # Backend Project - Meu Advogado 2.0
 
-**Fase:** producao Railway / spec 004 perfil do advogado pronta para breakdown
+**Fase:** producao Railway / spec 007 LGPD retencao OK_COM_RESSALVAS
 **Hospedagem alvo:** Railway  
 **Stack:** Node.js + Fastify + TypeScript + Zod
 
@@ -46,6 +46,7 @@ Construir a API que centraliza regra de negocio, autorizacao, match por localiza
 - `src/db/migrations/`: migrations versionadas e aplicadas manualmente no Supabase oficial.
 - `scripts/harness.ts` e `scripts/smoke.ts`: Harness CLI e smoke local.
 - `src/modules/lawyerProfiles`: `GET /v1/lawyers/:id` com auth cliente/admin, allowlist publica e `404` seguro para perfil indisponivel.
+- `src/modules/privacy`: retencao LGPD de `match_events` com expurgo por idade.
 
 ## Scripts
 
@@ -54,8 +55,11 @@ Construir a API que centraliza regra de negocio, autorizacao, match por localiza
 - `npm run test`
 - `npm run build`
 - `npm run migration:check`
+- `npm run retention:match-events`
 - `npm run smoke`
 - `npm run harness`
+
+`npm run retention:match-events` roda em dry-run por padrao. Para apply destrutivo, exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 
 ## Supabase Controlado
 

@@ -20,6 +20,7 @@
     "form:smoke": "tsx scripts/admin-form-smoke.ts",
     "match:smoke": "tsx scripts/match-smoke.ts",
     "prod:smoke": "tsx scripts/prod-smoke.ts",
+    "retention:match-events": "tsx scripts/retention-match-events.ts",
     "smoke": "tsx scripts/smoke.ts",
     "harness": "tsx scripts/harness.ts"
   },
