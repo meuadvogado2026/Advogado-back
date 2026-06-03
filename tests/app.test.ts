@@ -327,6 +327,44 @@ describe("foundation API", () => {
     expect(response.json().lawyer.profileId).toBeTruthy();
   });
 
+  it("lists admin lawyers with operational identity and area fields", async () => {
+    const app = await buildApp();
+    const email = `list-admin-lawyer-${Date.now()}@example.test`;
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyers",
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Lista Admin",
+        email,
+        whatsapp: "11999998888",
+        oabNumber: "456789",
+        oabState: "SP",
+        mainAreaId: "civil",
+        secondaryAreaIds: ["consumidor"],
+        officeCep: "01001-000",
+        officeNumber: "101",
+        status: "draft"
+      }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/lawyers", headers: ADMIN });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(list.statusCode).toBe(200);
+    const createdId = create.json().lawyer.id;
+    const lawyer = list.json().lawyers.find((item: { id: string }) => item.id === createdId);
+    expect(lawyer).toMatchObject({
+      name: "Dra. Lista Admin",
+      email,
+      oabNumber: "456789",
+      oabState: "SP",
+      mainAreaId: "civil",
+      secondaryAreaIds: ["consumidor"],
+      status: "draft"
+    });
+  });
+
   it("persists the geocoded coordinate when creating a lawyer", async () => {
     const app = await buildApp();
     const response = await app.inject({

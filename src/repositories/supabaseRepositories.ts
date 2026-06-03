@@ -122,7 +122,7 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 // Inclui office_lat/office_lng para refletir a coordenada persistida no escritorio.
 const LAWYER_COLUMNS =
-  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, office_cep, office_number, office_lat, office_lng, created_at, updated_at";
+  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, office_cep, office_number, office_city, office_state, office_lat, office_lng, created_at, updated_at";
 
 type LawyerRow = {
   id: string;
@@ -135,10 +135,26 @@ type LawyerRow = {
   full_bio: string | null;
   office_cep: string;
   office_number: string;
+  office_city: string | null;
+  office_state: string | null;
   office_lat: number | string | null;
   office_lng: number | string | null;
   created_at: string;
   updated_at: string;
+};
+
+type LawyerProfileSummary = {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  cover_url: string | null;
+};
+
+type LawyerSpecialtyRow = {
+  lawyer_profile_id: string;
+  specialty_id: string;
+  is_main: boolean;
 };
 
 const toCoord = (value: number | string | null): number | null =>
@@ -173,6 +189,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
       secondaryAreaIds: [],
       officeCep: row.office_cep,
       officeNumber: row.office_number,
+      officeCity: row.office_city,
+      officeState: row.office_state,
       status: row.status,
       officeLat: toCoord(row.office_lat),
       officeLng: toCoord(row.office_lng),
@@ -182,6 +200,51 @@ class SupabaseLawyerRepository implements LawyerRepository {
     };
   }
 
+  private async hydrateRows(rows: LawyerRow[]): Promise<LawyerRecord[]> {
+    if (rows.length === 0) return [];
+
+    const profileIds = [...new Set(rows.map((row) => row.profile_id))];
+    const lawyerIds = rows.map((row) => row.id);
+
+    const { data: profilesData, error: profilesError } = await this.supabase
+      .from("profiles")
+      .select("id, name, email, avatar_url, cover_url")
+      .in("id", profileIds);
+    assertSupabaseOk(profilesError, "profiles.listLawyerSummaries");
+
+    const { data: specialtiesData, error: specialtiesError } = await this.supabase
+      .from("lawyer_specialties")
+      .select("lawyer_profile_id, specialty_id, is_main")
+      .in("lawyer_profile_id", lawyerIds);
+    assertSupabaseOk(specialtiesError, "lawyer_specialties.listForLawyers");
+
+    const profileById = new Map(
+      ((profilesData ?? []) as LawyerProfileSummary[]).map((profile) => [profile.id, profile])
+    );
+    const specialtiesByLawyer = new Map<string, LawyerSpecialtyRow[]>();
+    for (const specialty of (specialtiesData ?? []) as LawyerSpecialtyRow[]) {
+      const current = specialtiesByLawyer.get(specialty.lawyer_profile_id) ?? [];
+      current.push(specialty);
+      specialtiesByLawyer.set(specialty.lawyer_profile_id, current);
+    }
+
+    return rows.map((row) => {
+      const profile = profileById.get(row.profile_id);
+      const specialties = specialtiesByLawyer.get(row.id) ?? [];
+      const mainArea = specialties.find((specialty) => specialty.is_main) ?? specialties[0];
+      return this.mapRow(row, {
+        name: profile?.name ?? "",
+        email: profile?.email ?? "",
+        avatarUrl: profile?.avatar_url ?? null,
+        coverUrl: profile?.cover_url ?? null,
+        mainAreaId: mainArea?.specialty_id ?? "",
+        secondaryAreaIds: specialties
+          .filter((specialty) => specialty.specialty_id !== mainArea?.specialty_id)
+          .map((specialty) => specialty.specialty_id)
+      });
+    });
+  }
+
   async list(): Promise<LawyerRecord[]> {
     const { data, error } = await this.supabase
       .from("lawyer_profiles")
@@ -189,7 +252,7 @@ class SupabaseLawyerRepository implements LawyerRepository {
       .order("created_at", { ascending: false });
     assertSupabaseOk(error, "lawyer_profiles.list");
 
-    return ((data ?? []) as LawyerRow[]).map((row) => this.mapRow(row));
+    return this.hydrateRows((data ?? []) as LawyerRow[]);
   }
 
   async getById(id: string): Promise<LawyerRecord | null> {
@@ -200,7 +263,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
       .maybeSingle();
     assertSupabaseOk(error, "lawyer_profiles.getById");
     if (!data) return null;
-    return this.mapRow(data as LawyerRow);
+    const [lawyer] = await this.hydrateRows([data as LawyerRow]);
+    return lawyer ?? null;
   }
 
   async create(input: LawyerCreate, coordinates?: LawyerCoordinates): Promise<LawyerRecord> {
@@ -230,6 +294,21 @@ class SupabaseLawyerRepository implements LawyerRepository {
     assertSupabaseOk(error, "lawyer_profiles.create");
     if (!data) {
       throw new Error("lawyer_profiles.create: Supabase nao retornou registro criado.");
+    }
+
+    const specialtyRows = [
+      { lawyer_profile_id: (data as LawyerRow).id, specialty_id: input.mainAreaId, is_main: true },
+      ...input.secondaryAreaIds.map((specialtyId) => ({
+        lawyer_profile_id: (data as LawyerRow).id,
+        specialty_id: specialtyId,
+        is_main: false
+      }))
+    ];
+    if (specialtyRows.length > 0) {
+      const { error: specialtiesError } = await this.supabase
+        .from("lawyer_specialties")
+        .upsert(specialtyRows, { onConflict: "lawyer_profile_id,specialty_id" });
+      assertSupabaseOk(specialtiesError, "lawyer_specialties.createForLawyer");
     }
 
     return this.mapRow(data as LawyerRow, {
@@ -264,6 +343,29 @@ class SupabaseLawyerRepository implements LawyerRepository {
       .maybeSingle();
     assertSupabaseOk(error, "lawyer_profiles.update");
     if (!data) return null;
+    if (patch.mainAreaId || patch.secondaryAreaIds) {
+      const nextAreaIds = [patch.mainAreaId, ...(patch.secondaryAreaIds ?? [])].filter(
+        (areaId): areaId is string => Boolean(areaId)
+      );
+      if (nextAreaIds.length > 0) {
+        const { error: deleteError } = await this.supabase
+          .from("lawyer_specialties")
+          .delete()
+          .eq("lawyer_profile_id", id);
+        assertSupabaseOk(deleteError, "lawyer_specialties.replace.delete");
+
+        const { error: insertError } = await this.supabase
+          .from("lawyer_specialties")
+          .insert(
+            nextAreaIds.map((specialtyId, index) => ({
+              lawyer_profile_id: id,
+              specialty_id: specialtyId,
+              is_main: index === 0
+            }))
+          );
+        assertSupabaseOk(insertError, "lawyer_specialties.replace.insert");
+      }
+    }
     if (patch.avatarUrl !== undefined || patch.coverUrl !== undefined) {
       await this.profiles.updateVisualFields((data as LawyerRow).profile_id, {
         avatarUrl: patch.avatarUrl,
@@ -271,12 +373,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
       });
     }
 
-    return this.mapRow(data as LawyerRow, {
-      name: patch.name ?? "",
-      email: patch.email ?? "",
-      mainAreaId: patch.mainAreaId ?? "",
-      secondaryAreaIds: patch.secondaryAreaIds ?? []
-    });
+    const [lawyer] = await this.hydrateRows([data as LawyerRow]);
+    return lawyer ?? null;
   }
 }
 

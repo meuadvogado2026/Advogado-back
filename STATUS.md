@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-03
-**Fase:** BACKEND / SPEC 008 PARTE 3 RETENCAO ORACAO PUBLICADA
-**Veredito:** SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Fase:** BACKEND / SPEC 009 ADMIN LISTAGEM HIDRATADA
+**Veredito:** ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -57,6 +57,8 @@
 - [x] Retencao LGPD de `prayer_requests` implementada sem migration nova: `npm run retention:prayer-requests` roda em dry-run por padrao, usa retencao de 90 dias e exige `--apply` + `PRAYER_REQUESTS_RETENTION_CONFIRMATION=APPLY_PRAYER_REQUESTS_RETENTION` para expurgo destrutivo.
 - [x] `prod:smoke` ajustado para limpar os `prayer_requests` neutros criados pelo proprio smoke; smoke Railway passou com `prayerRequestsDeleted=2`, sem ecoar texto nem `clientProfileId`.
 - [x] Pacote de retencao de `prayer_requests` versionado e publicado no repo oficial pelo commit `5434baa` (`Implement prayer requests retention`); smoke Railway pos-push passou com limpeza de `match_events` e `prayer_requests` neutros criados no teste.
+- [x] Spec 009 backend implementada localmente: `GET /v1/admin/lawyers` em modo Supabase agora hidrata `name`, `email`, `mainAreaId` e `secondaryAreaIds` via `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste `lawyer_specialties` com area principal/secundarias.
+- [x] Harness backend da spec 009 passou com exit code 0: typecheck, 51 testes, build, migration dry-run e smoke local.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -107,7 +109,8 @@
 - `0003_prayer_requests.sql` foi aplicada manualmente no Supabase aprovado pelo usuario. A retencao operacional de `prayer_requests` esta formalizada e testada; apply destrutivo real deve ocorrer somente em janela aprovada quando houver pedidos antigos elegiveis.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
+- Spec 009 backend ainda precisa publicacao Railway e smoke proporcional pos-deploy junto com o admin Vercel.
 
 ## Proximo Passo
 
-Parte 3 da spec 008 esta `SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK`: migration aplicada, backend publicado, smoke real dos endpoints de dashboard/oracao passou com tokens redigidos, contrato de oracao nao ecoa texto e retencao/limpeza operacional de `prayer_requests` foi implementada/testada e versionada no repo oficial. Apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.
+Spec 009 backend esta `ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK` em ambiente local controlado com Supabase real; proximo gate e publicar backend/admin e repetir smoke proporcional no Vercel/Railway. Parte 3 da spec 008 segue `SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK`; apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.

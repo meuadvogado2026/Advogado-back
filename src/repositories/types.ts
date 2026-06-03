@@ -30,6 +30,8 @@ export type LawyerRecord = LawyerCreate & {
   profileId: string;
   officeLat?: number | null;
   officeLng?: number | null;
+  officeCity?: string | null;
+  officeState?: string | null;
   createdAt: string;
   updatedAt: string;
 };

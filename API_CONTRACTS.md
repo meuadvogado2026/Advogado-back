@@ -41,6 +41,38 @@
 - `CRUD /v1/admin/benefits`
 - `CRUD /v1/admin/partners`
 
+## GET /v1/admin/lawyers (spec 009)
+
+Requer `Authorization: Bearer <token>` com role `admin`. Retorna lista operacional
+segura para o painel administrativo, sem CEP completo, coordenada exata, token, senha
+ou payload sensivel.
+
+Resposta `200`:
+
+```json
+{
+  "lawyers": [
+    {
+      "id": "...",
+      "name": "...",
+      "email": "...",
+      "oab": "123456/SP",
+      "status": "pending",
+      "officeCity": "Sao Paulo",
+      "officeState": "SP",
+      "mainAreaId": "...",
+      "secondaryAreaIds": ["..."],
+      "createdAt": "2026-06-03T00:00:00Z"
+    }
+  ]
+}
+```
+
+Em modo Supabase, o repositorio hidrata `name`, `email`, imagens seguras e areas a
+partir de `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste area
+principal/secundarias em `lawyer_specialties`. A regra de aprovacao continua bloqueando
+`approved` sem coordenada valida.
+
 ## POST /v1/match (match real geoespacial)
 
 Requer `Authorization: Bearer <token>` (`client` ou `admin`). Sem token -> `401`.
