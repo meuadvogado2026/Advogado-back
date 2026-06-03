@@ -6,6 +6,11 @@ import { apiError } from "../../lib/httpError.js";
 import type { Repositories } from "../../repositories/types.js";
 
 const ALGORITHM_VERSION = "geo-nearest-v1";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isSupabaseAreaId(value: string) {
+  return UUID_PATTERN.test(value);
+}
 
 export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireClient = createAuthPreHandler(env, repositories, ["client", "admin"]);
@@ -17,6 +22,10 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
     }
 
     const { lat, lng, accuracyM, areaIds } = parsed.data;
+    if (repositories.mode === "supabase" && areaIds.some((areaId) => !isSupabaseAreaId(areaId))) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Payload de match invalido."));
+    }
+
     const nearest = await repositories.matches.findNearest({
       lat,
       lng,
