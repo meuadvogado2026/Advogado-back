@@ -50,7 +50,13 @@ export const geocodeCepSchema = z.object({
   cep: z.string().regex(/^\d{5}-?\d{3}$/)
 });
 
+export const prayerRequestSchema = z.object({
+  message: z.string().trim().min(20).max(500),
+  anonymous: z.boolean().default(true)
+});
+
 export type MatchRequest = z.infer<typeof matchRequestSchema>;
 export type LawyerCreate = z.infer<typeof lawyerCreateSchema>;
 export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
 export type GeocodeCep = z.infer<typeof geocodeCepSchema>;
+export type PrayerRequest = z.infer<typeof prayerRequestSchema>;

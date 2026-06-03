@@ -17,12 +17,13 @@
 - `GET /v1/areas`
 - `POST /v1/match` - exige Bearer token (`client` ou `admin`); ver contrato abaixo
 - `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client` ou `admin`)
+- `POST /v1/prayer-requests` - implementado na spec 008 Parte 3; exige Bearer token `client`
 - `POST /v1/lawyers/:id/events`
 - `POST /v1/lawyers/:id/urgent-calls`
 
 ## Advogado
 
-- `GET /v1/lawyer/dashboard`
+- `GET /v1/lawyer/me/dashboard` - implementado na spec 008 Parte 3; exige Bearer token `lawyer`
 - `GET /v1/lawyer/vip-card`
 - `GET /v1/lawyer/benefits`
 
@@ -144,6 +145,53 @@ Requer `Authorization: Bearer <token>`. Retorna somente identidade minima e role
 
 Sem token -> `401`; token invalido -> `401`; perfil sem role autorizada -> `403`.
 Nao retorna token, service role, dados de perfil completos ou payload sensivel.
+
+## GET /v1/lawyer/me/dashboard (spec 008 Parte 3)
+
+Requer `Authorization: Bearer <token>` com role `lawyer`. Cliente recebe `403`.
+
+Resposta `200`:
+
+```json
+{
+  "lawyer": {
+    "id": "...",
+    "name": "Dra. Nome",
+    "oabNumber": "123456",
+    "oabState": "SP",
+    "avatarUrl": null,
+    "coverUrl": null,
+    "planLabel": "MVP interno",
+    "verified": true
+  },
+  "metrics": { "profileViews": 0, "whatsappClicks": 0, "contacts": 0 },
+  "benefits": [{ "id": "verified-profile", "title": "Perfil verificado", "description": "..." }]
+}
+```
+
+Metricas sao zeradas/placeholder seguro no MVP. Beneficios sao estaticos, sem pagamento,
+parceiro externo, cupom real, chat ou agenda.
+
+## POST /v1/prayer-requests (spec 008 Parte 3)
+
+Requer `Authorization: Bearer <token>` com role `client`. Advogado/admin recebem `403`.
+Endpoint possui rate limit proporcional.
+
+Request:
+
+```json
+{ "message": "Texto entre 20 e 500 caracteres", "anonymous": true }
+```
+
+Resposta `201`:
+
+```json
+{ "request": { "id": "...", "status": "received", "createdAt": "2026-06-03T00:00:00Z" } }
+```
+
+Regras: `anonymous=true` persiste `client_profile_id = null`; `anonymous=false` persiste
+somente o profile id autenticado. A resposta nao ecoa o texto. Logs, harness e docs nao
+devem registrar texto do pedido, token, telefone completo, coordenada ou payload sensivel.
 
 ## Observacao Da Fundacao
 

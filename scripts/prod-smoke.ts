@@ -15,6 +15,9 @@ import { createSupabaseAdminClient } from "../src/lib/supabase.js";
  *  - GET  /v1/lawyers/:id (cliente real): 200 com allowlist publica, 401 sem token
  *  - POST /v1/admin/geocode/cep (admin real): 200
  *  - GET  /v1/admin/lawyers (admin real): 200 persistence=supabase
+ *  - GET  /v1/lawyer/me/dashboard: 401 sem token, 403 cliente, 200 advogado
+ *  - POST /v1/prayer-requests: 401 sem token, 403 advogado/admin, 422 invalido,
+ *    201 cliente anonimo/identificado sem ecoar mensagem
  * Limpa os match_events criados (residuo LGPD). Tokens nunca impressos.
  *
  * Uso (cwd = back):
@@ -28,10 +31,30 @@ if (!BASE) throw new Error("PROD_BASE_URL e obrigatoria (ex.: https://seu-app.up
 
 const ADMIN_EMAIL = "admin@advogado20.com";
 const CLIENT_EMAIL = "usuario@advogado20.com";
+const LAWYER_EMAIL = "advogado@advogado20.com";
 const SP_FIXTURE = { lat: -23.561414, lng: -46.655881 };
 const COVERED = new Set(["civil", "consumidor", "trabalhista", "familia"]);
-const PUBLIC_PROFILE_KEYS = new Set(["id", "name", "oabNumber", "oabState", "city", "state", "areaIds", "areas", "whatsapp", "verified"]);
+const PUBLIC_PROFILE_KEYS = new Set([
+  "id",
+  "name",
+  "oabNumber",
+  "oabState",
+  "city",
+  "state",
+  "areaIds",
+  "areas",
+  "whatsapp",
+  "verified",
+  "avatarUrl",
+  "coverUrl",
+  "miniBio",
+  "fullBio",
+  "yearsExperience",
+  "planLabel",
+  "emergencyAvailable"
+]);
 const PUBLIC_AREA_KEYS = new Set(["id", "name"]);
+const NEUTRAL_PRAYER_TEXT = "Pedido neutro de teste automatizado sem dado sensivel.";
 
 function cred(raw: string, email: string) {
   const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -56,8 +79,10 @@ const credsRaw = await readFile(resolve(process.cwd(), "..", "Credenciais para t
 const authClient = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 const adminToken = await login(authClient, cred(credsRaw, ADMIN_EMAIL));
 const clientToken = await login(authClient, cred(credsRaw, CLIENT_EMAIL));
+const lawyerToken = await login(authClient, cred(credsRaw, LAWYER_EMAIL));
 const adminH = { authorization: `Bearer ${adminToken}`, "content-type": "application/json" };
 const clientH = { authorization: `Bearer ${clientToken}`, "content-type": "application/json" };
+const lawyerH = { authorization: `Bearer ${lawyerToken}`, "content-type": "application/json" };
 
 const steps: Array<Record<string, unknown>> = [];
 let ok = true;
@@ -124,6 +149,83 @@ mark({ step: "POST /v1/admin/geocode/cep", status: geo.status, persistence: (geo
 const lw = await call("/v1/admin/lawyers", { headers: adminH });
 const pers = (lw.body as { persistence?: string })?.persistence;
 mark({ step: "GET /v1/admin/lawyers", status: lw.status, persistence: pers }, lw.status === 200 && pers === "supabase");
+
+// spec 008 part 3 - lawyer dashboard auth/role matrix
+const dashboardNoTok = await call("/v1/lawyer/me/dashboard");
+mark({ step: "GET /v1/lawyer/me/dashboard sem token", status: dashboardNoTok.status }, dashboardNoTok.status === 401);
+
+const dashboardClient = await call("/v1/lawyer/me/dashboard", { headers: clientH });
+mark({ step: "GET /v1/lawyer/me/dashboard cliente", status: dashboardClient.status }, dashboardClient.status === 403);
+
+const dashboardLawyer = await call("/v1/lawyer/me/dashboard", { headers: lawyerH });
+const dashboardBody = dashboardLawyer.body as { lawyer?: { id?: string; name?: string }; metrics?: unknown; benefits?: unknown[] };
+mark(
+  {
+    step: "GET /v1/lawyer/me/dashboard advogado",
+    status: dashboardLawyer.status,
+    hasLawyer: Boolean(dashboardBody?.lawyer?.id),
+    benefitsCount: Array.isArray(dashboardBody?.benefits) ? dashboardBody.benefits.length : null
+  },
+  dashboardLawyer.status === 200 && Boolean(dashboardBody?.lawyer?.id) && Array.isArray(dashboardBody?.benefits)
+);
+
+// spec 008 part 3 - prayer request auth/role matrix and no message echo
+const prayerNoTok = await call("/v1/prayer-requests", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: true })
+});
+mark({ step: "POST /v1/prayer-requests sem token", status: prayerNoTok.status }, prayerNoTok.status === 401);
+
+const prayerLawyer = await call("/v1/prayer-requests", {
+  method: "POST",
+  headers: lawyerH,
+  body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: true })
+});
+mark({ step: "POST /v1/prayer-requests advogado", status: prayerLawyer.status }, prayerLawyer.status === 403);
+
+const prayerAdmin = await call("/v1/prayer-requests", {
+  method: "POST",
+  headers: adminH,
+  body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: true })
+});
+mark({ step: "POST /v1/prayer-requests admin", status: prayerAdmin.status }, prayerAdmin.status === 403);
+
+const prayerInvalid = await call("/v1/prayer-requests", {
+  method: "POST",
+  headers: clientH,
+  body: JSON.stringify({ message: "curto", anonymous: true })
+});
+mark({ step: "POST /v1/prayer-requests payload invalido", status: prayerInvalid.status }, prayerInvalid.status === 422);
+
+const prayerAnonymous = await call("/v1/prayer-requests", {
+  method: "POST",
+  headers: clientH,
+  body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: true })
+});
+const anonymousEcho = JSON.stringify(prayerAnonymous.body).includes(NEUTRAL_PRAYER_TEXT);
+mark(
+  { step: "POST /v1/prayer-requests cliente anonimo", status: prayerAnonymous.status, echoedMessage: anonymousEcho },
+  prayerAnonymous.status === 201 && !anonymousEcho
+);
+
+const prayerIdentified = await call("/v1/prayer-requests", {
+  method: "POST",
+  headers: clientH,
+  body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: false })
+});
+const identifiedBody = JSON.stringify(prayerIdentified.body);
+mark(
+  {
+    step: "POST /v1/prayer-requests cliente identificado",
+    status: prayerIdentified.status,
+    echoedMessage: identifiedBody.includes(NEUTRAL_PRAYER_TEXT),
+    echoedClientProfileId: identifiedBody.includes("clientProfileId")
+  },
+  prayerIdentified.status === 201 &&
+    !identifiedBody.includes(NEUTRAL_PRAYER_TEXT) &&
+    !identifiedBody.includes("clientProfileId")
+);
 
 // cleanup match_events
 let cleanup: Record<string, unknown> = { attempted: false };

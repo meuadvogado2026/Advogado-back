@@ -3,6 +3,7 @@ import { legalAreas } from "../modules/areas/legalAreas.js";
 import type {
   AuditLogRepository,
   LawyerCoordinates,
+  LawyerDashboardRepository,
   LawyerRecord,
   LawyerRepository,
   LegalSpecialtyRepository,
@@ -12,6 +13,7 @@ import type {
   Profile,
   ProfileRepository,
   PublicLawyerProfileRepository,
+  PrayerRequestRepository,
   Repositories
 } from "./types.js";
 
@@ -29,6 +31,14 @@ profiles.set("test-client-user", {
   role: "client",
   name: "Cliente Teste",
   email: "client@example.test"
+});
+profiles.set("test-lawyer-user", {
+  id: "test-lawyer-user",
+  role: "lawyer",
+  name: "Dra. Teste",
+  email: "lawyer@example.test",
+  avatarUrl: "https://example.test/lawyer-avatar.jpg",
+  coverUrl: null
 });
 
 class MemoryProfileRepository implements ProfileRepository {
@@ -263,6 +273,55 @@ class MemoryMatchEventRepository implements MatchEventRepository {
   }
 }
 
+class MemoryLawyerDashboardRepository implements LawyerDashboardRepository {
+  async getByProfileId(profileId: string) {
+    const profile = profiles.get(profileId);
+    if (!profile || profile.role !== "lawyer") return null;
+
+    return {
+      lawyer: {
+        id: "fixture-lawyer-dashboard",
+        name: profile.name,
+        oabNumber: "123456",
+        oabState: "SP",
+        avatarUrl: profile.avatarUrl ?? null,
+        coverUrl: profile.coverUrl ?? null,
+        planLabel: "MVP interno",
+        verified: true
+      },
+      metrics: {
+        profileViews: 0,
+        whatsappClicks: 0,
+        contacts: 0
+      },
+      benefits: [
+        {
+          id: "verified-profile",
+          title: "Perfil verificado",
+          description: "Presenca profissional no app com dados revisados pelo admin.",
+          badge: "MVP"
+        },
+        {
+          id: "external-whatsapp",
+          title: "Contato externo seguro",
+          description: "Atendimento segue pelo WhatsApp, sem chat interno no MVP."
+        }
+      ]
+    };
+  }
+}
+
+class MemoryPrayerRequestRepository implements PrayerRequestRepository {
+  async create(input: Parameters<PrayerRequestRepository["create"]>[0]) {
+    void input.message;
+    return {
+      id: crypto.randomUUID(),
+      status: "received" as const,
+      createdAt: new Date().toISOString()
+    };
+  }
+}
+
 export function createMemoryRepositories(): Repositories {
   const profileRepository = new MemoryProfileRepository();
   return {
@@ -270,6 +329,8 @@ export function createMemoryRepositories(): Repositories {
     legalSpecialties: new MemoryLegalSpecialtyRepository(),
     lawyers: new MemoryLawyerRepository(profileRepository),
     publicLawyerProfiles: new MemoryPublicLawyerProfileRepository(),
+    lawyerDashboards: new MemoryLawyerDashboardRepository(),
+    prayerRequests: new MemoryPrayerRequestRepository(),
     auditLogs: new MemoryAuditLogRepository(),
     matches: new MemoryMatchRepository(),
     matchEvents: new MemoryMatchEventRepository(),

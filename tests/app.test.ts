@@ -3,6 +3,8 @@ import { buildApp } from "../src/app.js";
 import { createMemoryRepositories } from "../src/repositories/memoryRepositories.js";
 
 const ADMIN = { authorization: "Bearer test-admin-token" };
+const CLIENT = { authorization: "Bearer test-client-token" };
+const LAWYER = { authorization: "Bearer test-lawyer-token" };
 
 // Cadastro minimo de advogado sem coordenada (geocoding nao executado).
 const draftWithoutCoordinate = (overrides: Record<string, unknown> = {}) => ({
@@ -452,5 +454,109 @@ describe("foundation API", () => {
     expect(body.coordinates.provider).toBe("stub");
     expect(typeof body.coordinates.lat).toBe("number");
     expect(body.coordinates.confidence).toBeTruthy();
+  });
+
+  it("requires auth on lawyer dashboard", async () => {
+    const app = await buildApp();
+    const response = await app.inject({ method: "GET", url: "/v1/lawyer/me/dashboard" });
+    await app.close();
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("rejects client role on lawyer dashboard", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/lawyer/me/dashboard",
+      headers: CLIENT
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe("FORBIDDEN");
+  });
+
+  it("returns a safe lawyer dashboard for lawyer role", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/lawyer/me/dashboard",
+      headers: LAWYER
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.lawyer).toMatchObject({
+      name: "Dra. Teste",
+      planLabel: "MVP interno",
+      verified: true
+    });
+    expect(body.metrics).toEqual({ profileViews: 0, whatsappClicks: 0, contacts: 0 });
+    expect(body.benefits.length).toBeGreaterThan(0);
+    expect(JSON.stringify(body)).not.toContain("officeCep");
+    expect(JSON.stringify(body)).not.toContain("client_location");
+  });
+
+  it("requires auth on prayer requests", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      payload: { message: "Pedido com tamanho suficiente para teste.", anonymous: true }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("rejects lawyer role on prayer requests", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: LAWYER,
+      payload: { message: "Pedido com tamanho suficiente para teste.", anonymous: true }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe("FORBIDDEN");
+  });
+
+  it("validates prayer request message size", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "curto", anonymous: true }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("creates an anonymous prayer request without echoing the message", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "Pedido reservado com tamanho suficiente para passar na validacao.", anonymous: true }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json();
+    expect(body.request.status).toBe("received");
+    expect(body.request.id).toBeTruthy();
+    expect(body.request.createdAt).toBeTruthy();
+    expect(JSON.stringify(body)).not.toContain("Pedido reservado");
+    expect(JSON.stringify(body)).not.toContain("clientProfileId");
   });
 });

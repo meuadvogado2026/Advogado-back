@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
-**Ultima atualizacao:** 2026-06-02
-**Fase:** BACKEND EM PRODUCAO NA RAILWAY / SPEC 008 PARTE 2 PUBLICADA
-**Veredito:** PUBLICADA_OK
+**Ultima atualizacao:** 2026-06-03
+**Fase:** BACKEND / SPEC 008 PARTE 3 PUBLICATION GATE
+**Veredito:** QUESTIONAR_MIGRATION_SUPABASE
 
 ## Producao (Railway)
 
@@ -50,6 +50,10 @@
 - [x] Smoke autenticado do admin publicado validou backend Railway para `POST /v1/admin/geocode/cep` e `POST /v1/admin/lawyers`; cadastro descartavel foi limpo via service role local e verificacao final ficou sem residuo.
 - [x] Spec 008 Parte 2 implementada localmente: `GET /v1/lawyers/:id` ganhou campos opcionais `avatarUrl`, `coverUrl`, `miniBio`, `fullBio`, `yearsExperience`, `planLabel` e `emergencyAvailable` sem quebrar contrato; URLs visuais inseguras/invalidas viram `null`.
 - [x] Allowlist publica revalidada: perfil segue sem CEP, endereco completo, coordenada, email interno, status administrativo ou auditoria. Testes cobrem `401`, `403`, `404`, `200` e URL insegura normalizada.
+- [x] Spec 008 Parte 3 implementada localmente: `GET /v1/lawyer/me/dashboard` com role `lawyer`, beneficios estaticos/seguros e metricas zeradas; `POST /v1/prayer-requests` com role `client`, validacao Zod, rate limit, anonimato e resposta sem ecoar texto.
+- [x] Migration aditiva `0003_prayer_requests.sql` versionada e validada por `npm run migration:check`; nao aplicada remotamente neste ciclo.
+- [x] Harness backend passou em 2026-06-03 com typecheck, 45 testes, build, migration dry-run e smoke local.
+- [x] Gate de publicacao da Parte 3 revalidou `npm run migration:check` e `npm run harness` com exit 0, mas bloqueou deploy porque `psql`, `SUPABASE_DB_URL` e flags de apply nao estao disponiveis. Railway atual respondeu `404` nos endpoints novos sem credenciais.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -88,6 +92,7 @@
 - [x] Dry-run real de `npm run retention:match-events` passou com `matchedEvents=0`, `deletedEvents=0`, `applied=false`.
 - [ ] Executar apply remoto real da spec 007 somente quando houver janela aprovada e necessidade operacional.
 - [x] Apoiar spec 006 com contrato seguro de perfil/role (`GET /v1/me`) e harness backend exit 0.
+- [x] Apoiar spec 008 Parte 3 localmente com dashboard advogado e pedido de oracao.
 
 ## Bloqueios
 
@@ -96,9 +101,10 @@
 - CORS para `https://advogado20admin.vercel.app` esta validado em producao apos commit `844c048`; o smoke autenticado do admin publicado fechou com limpeza. Negativo nao-admin publicado segue pendente apenas se houver credencial segura desse perfil.
 - Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
+- `0003_prayer_requests.sql` ainda nao foi aplicada no Supabase/Railway; endpoint de oracao em producao depende desse apply antes do deploy operacional.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 
 ## Proximo Passo
 
-Parte 2 da spec 008 esta publicada no backend. Proximo gate backend: apenas repetir smoke se houver novo deploy/contrato; apply destrutivo da spec 007 segue independente e somente com janela aprovada.
+Parte 3 da spec 008 esta `QUESTIONAR_MIGRATION_SUPABASE` para publicacao. Proximo gate backend: aplicar `0003_prayer_requests.sql` no Supabase aprovado, publicar backend e repetir smoke real dos endpoints de dashboard/oracao com tokens redigidos. Apply destrutivo da spec 007 segue independente e somente com janela aprovada.

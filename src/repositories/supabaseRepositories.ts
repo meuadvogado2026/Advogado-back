@@ -3,6 +3,8 @@ import type { LawyerCreate, LawyerPatch } from "../contracts/api.js";
 import type {
   AuditLogRepository,
   LawyerCoordinates,
+  LawyerDashboard,
+  LawyerDashboardRepository,
   LawyerRecord,
   LawyerRepository,
   LegalSpecialty,
@@ -15,6 +17,7 @@ import type {
   ProfileRepository,
   PublicLawyerProfile,
   PublicLawyerProfileRepository,
+  PrayerRequestRepository,
   Repositories
 } from "./types.js";
 
@@ -418,6 +421,88 @@ class SupabaseMatchEventRepository implements MatchEventRepository {
   }
 }
 
+type LawyerDashboardRow = {
+  id: string;
+  oab_number: string;
+  oab_state: string;
+  profiles: { name: string; avatar_url: string | null; cover_url: string | null } | Array<{ name: string; avatar_url: string | null; cover_url: string | null }>;
+};
+
+const staticLawyerBenefits: LawyerDashboard["benefits"] = [
+  {
+    id: "verified-profile",
+    title: "Perfil verificado",
+    description: "Presenca profissional no app com dados revisados pelo admin.",
+    badge: "MVP"
+  },
+  {
+    id: "external-whatsapp",
+    title: "Contato externo seguro",
+    description: "Atendimento segue pelo WhatsApp, sem chat interno no MVP."
+  }
+];
+
+class SupabaseLawyerDashboardRepository implements LawyerDashboardRepository {
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  async getByProfileId(profileId: string): Promise<LawyerDashboard | null> {
+    const { data, error } = await this.supabase
+      .from("lawyer_profiles")
+      .select("id, oab_number, oab_state, profiles!inner(name, avatar_url, cover_url)")
+      .eq("profile_id", profileId)
+      .in("status", ["approved", "pending_review", "draft"])
+      .limit(1)
+      .maybeSingle();
+    assertSupabaseOk(error, "lawyer_profiles.getDashboardByProfileId");
+    if (!data) return null;
+
+    const row = data as unknown as LawyerDashboardRow;
+    const profile = firstRelation(row.profiles);
+    return {
+      lawyer: {
+        id: row.id,
+        name: profile.name,
+        oabNumber: row.oab_number,
+        oabState: row.oab_state,
+        avatarUrl: profile.avatar_url,
+        coverUrl: profile.cover_url,
+        planLabel: "MVP interno",
+        verified: true
+      },
+      metrics: {
+        profileViews: 0,
+        whatsappClicks: 0,
+        contacts: 0
+      },
+      benefits: staticLawyerBenefits
+    };
+  }
+}
+
+class SupabasePrayerRequestRepository implements PrayerRequestRepository {
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  async create(input: Parameters<PrayerRequestRepository["create"]>[0]) {
+    const { data, error } = await this.supabase
+      .from("prayer_requests")
+      .insert({
+        client_profile_id: input.anonymous ? null : input.clientProfileId,
+        message: input.message,
+        anonymous: input.anonymous,
+        status: "received"
+      })
+      .select("id, status, created_at")
+      .single();
+    assertSupabaseOk(error, "prayer_requests.create");
+    const row = data as { id: string; status: "received"; created_at: string };
+    return {
+      id: row.id,
+      status: row.status,
+      createdAt: row.created_at
+    };
+  }
+}
+
 export function createSupabaseRepositories(supabase: SupabaseClient): Repositories {
   const profiles = new SupabaseProfileRepository(supabase);
   return {
@@ -425,6 +510,8 @@ export function createSupabaseRepositories(supabase: SupabaseClient): Repositori
     legalSpecialties: new SupabaseLegalSpecialtyRepository(supabase),
     lawyers: new SupabaseLawyerRepository(supabase, profiles),
     publicLawyerProfiles: new SupabasePublicLawyerProfileRepository(supabase),
+    lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase),
+    prayerRequests: new SupabasePrayerRequestRepository(supabase),
     auditLogs: new SupabaseAuditLogRepository(supabase),
     matches: new SupabaseMatchRepository(supabase),
     matchEvents: new SupabaseMatchEventRepository(supabase),

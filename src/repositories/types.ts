@@ -1,4 +1,4 @@
-import type { LawyerCreate, LawyerPatch } from "../contracts/api.js";
+import type { LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
 import type { Role } from "../auth/types.js";
 
 export type Profile = {
@@ -79,6 +79,44 @@ export interface PublicLawyerProfileRepository {
   getApprovedById(id: string): Promise<PublicLawyerProfile | null>;
 }
 
+export type LawyerDashboard = {
+  lawyer: {
+    id: string;
+    name: string;
+    oabNumber: string;
+    oabState: string;
+    avatarUrl?: string | null;
+    coverUrl?: string | null;
+    planLabel: string;
+    verified: boolean;
+  };
+  metrics: {
+    profileViews: number;
+    whatsappClicks: number;
+    contacts: number;
+  };
+  benefits: Array<{
+    id: string;
+    title: string;
+    description: string;
+    badge?: string;
+  }>;
+};
+
+export interface LawyerDashboardRepository {
+  getByProfileId(profileId: string): Promise<LawyerDashboard | null>;
+}
+
+export type PrayerRequestRecord = {
+  id: string;
+  status: "received";
+  createdAt: string;
+};
+
+export interface PrayerRequestRepository {
+  create(input: PrayerRequest & { clientProfileId: string }): Promise<PrayerRequestRecord>;
+}
+
 export interface AuditLogRepository {
   record(input: {
     actorProfileId?: string;
@@ -135,6 +173,8 @@ export type Repositories = {
   legalSpecialties: LegalSpecialtyRepository;
   lawyers: LawyerRepository;
   publicLawyerProfiles: PublicLawyerProfileRepository;
+  lawyerDashboards: LawyerDashboardRepository;
+  prayerRequests: PrayerRequestRepository;
   auditLogs: AuditLogRepository;
   matches: MatchRepository;
   matchEvents: MatchEventRepository;

@@ -8,6 +8,7 @@ import { registerAuthRoutes } from "./modules/auth/routes.js";
 import { registerHealthRoutes } from "./modules/health/routes.js";
 import { registerLawyerProfileRoutes } from "./modules/lawyerProfiles/routes.js";
 import { registerMatchRoutes } from "./modules/match/routes.js";
+import { registerSpec008Routes } from "./modules/spec008/routes.js";
 import { createRepositories } from "./repositories/index.js";
 
 export async function buildApp() {
@@ -32,6 +33,7 @@ export async function buildApp() {
     await registerAuthRoutes(v1, env, repositories);
     await registerMatchRoutes(v1, env, repositories);
     await registerLawyerProfileRoutes(v1, env, repositories);
+    await registerSpec008Routes(v1, env, repositories);
     await registerAdminLawyerRoutes(v1, env, repositories);
   }, { prefix: env.API_BASE_PATH });
 

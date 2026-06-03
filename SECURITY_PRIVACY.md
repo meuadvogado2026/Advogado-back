@@ -56,6 +56,15 @@ somente pela allowlist publica. URLs de imagem aceitam apenas HTTPS; URL ausente
 invalida ou insegura vira `null`/fallback. O contrato continua sem CEP, endereco
 completo, coordenada exata, email interno, status administrativo ou auditoria.
 
+## Spec 008 Parte 3 - Dashboard E Oracao
+
+`GET /v1/lawyer/me/dashboard` exige role `lawyer` e retorna apenas perfil profissional
+seguro, metricas zeradas e beneficios estaticos. `POST /v1/prayer-requests` exige role
+`client`, valida texto de 20 a 500 caracteres e aplica rate limit. O texto livre pode
+conter dado sensivel espontaneo, portanto nao deve aparecer em logs, audit metadata,
+harness, screenshots ou relatorios. A resposta registra somente id/status/data. A
+retencao operacional de `prayer_requests` deve ser fechada antes de producao.
+
 ## Migration Controlada
 
 `npm run migration:check` valida a migration sem aplicar remotamente, mesmo se a env tiver flags de aplicacao. Aplicacao remota so e tentada com `npm run migration:apply`, `APPLY_REMOTE_MIGRATIONS=true`, `SUPABASE_DB_URL` configurado e `MIGRATION_CONFIRMATION=APPLY_MEU_ADVOGADO_20_FOUNDATION`.
