@@ -70,7 +70,7 @@
 - Urgencia deve ter idempotencia.
 - `match_events.client_location` guarda coordenada precisa do cliente para o match atual e deve seguir politica de retencao LGPD da spec 007.
 - Recomendacao MVP da spec 007: expurgo integral de eventos antigos apos 90 dias via `npm run retention:match-events`; dry-run validado, apply remoto ainda nao executado.
-- `prayer_requests` e tabela aditiva da spec 008 Parte 3. `anonymous=true` guarda `client_profile_id = null`; `anonymous=false` guarda somente o profile id autenticado. O texto nao deve ir para logs, audit metadata, harness ou screenshots. Retencao final antes de producao permanece como ressalva operacional.
+- `prayer_requests` e tabela aditiva da spec 008 Parte 3. `anonymous=true` guarda `client_profile_id = null`; `anonymous=false` guarda somente o profile id autenticado. O texto nao deve ir para logs, audit metadata, harness ou screenshots. Retencao MVP: expurgo integral apos 90 dias via `npm run retention:prayer-requests`, dry-run por padrao e apply destrutivo com confirmacao explicita.
 
 ## Migration Inicial
 
@@ -82,7 +82,7 @@ Status: rascunho versionado, nao aplicado remotamente por ausencia de credenciai
 
 Arquivo: `src/db/migrations/0003_prayer_requests.sql`.
 
-Status: versionado e validado por `npm run migration:check` em dry-run estatico; nao aplicado remotamente neste ciclo.
+Status: versionado, validado por `npm run migration:check` em dry-run estatico e aplicado manualmente no Supabase aprovado em 2026-06-03.
 
 ## Revisao Do Ciclo Auth/Supabase
 

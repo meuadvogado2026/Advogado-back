@@ -21,6 +21,7 @@
     "match:smoke": "tsx scripts/match-smoke.ts",
     "prod:smoke": "tsx scripts/prod-smoke.ts",
     "retention:match-events": "tsx scripts/retention-match-events.ts",
+    "retention:prayer-requests": "tsx scripts/retention-prayer-requests.ts",
     "smoke": "tsx scripts/smoke.ts",
     "harness": "tsx scripts/harness.ts"
   },

@@ -62,8 +62,11 @@ completo, coordenada exata, email interno, status administrativo ou auditoria.
 seguro, metricas zeradas e beneficios estaticos. `POST /v1/prayer-requests` exige role
 `client`, valida texto de 20 a 500 caracteres e aplica rate limit. O texto livre pode
 conter dado sensivel espontaneo, portanto nao deve aparecer em logs, audit metadata,
-harness, screenshots ou relatorios. A resposta registra somente id/status/data. A
-retencao operacional de `prayer_requests` deve ser fechada antes de producao.
+harness, screenshots ou relatorios. A resposta registra somente id/status/data.
+`prayer_requests` segue retencao operacional MVP de 90 dias via
+`npm run retention:prayer-requests`, com dry-run padrao e apply destrutivo bloqueado por
+`PRAYER_REQUESTS_RETENTION_CONFIRMATION=APPLY_PRAYER_REQUESTS_RETENTION`. O `prod:smoke`
+deve limpar os pedidos neutros criados no teste.
 
 ## Migration Controlada
 

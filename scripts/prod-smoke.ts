@@ -88,6 +88,7 @@ const steps: Array<Record<string, unknown>> = [];
 let ok = true;
 const startedAt = new Date(Date.now() - 1000).toISOString();
 const mark = (s: Record<string, unknown>, pass: boolean) => { ok &&= pass; steps.push({ ...s, ok: pass }); };
+const prayerRequestIds: string[] = [];
 
 // health
 const health = await call("/health");
@@ -204,6 +205,8 @@ const prayerAnonymous = await call("/v1/prayer-requests", {
   body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: true })
 });
 const anonymousEcho = JSON.stringify(prayerAnonymous.body).includes(NEUTRAL_PRAYER_TEXT);
+const anonymousPrayerId = (prayerAnonymous.body as { request?: { id?: string } })?.request?.id;
+if (anonymousPrayerId) prayerRequestIds.push(anonymousPrayerId);
 mark(
   { step: "POST /v1/prayer-requests cliente anonimo", status: prayerAnonymous.status, echoedMessage: anonymousEcho },
   prayerAnonymous.status === 201 && !anonymousEcho
@@ -215,6 +218,8 @@ const prayerIdentified = await call("/v1/prayer-requests", {
   body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: false })
 });
 const identifiedBody = JSON.stringify(prayerIdentified.body);
+const identifiedPrayerId = (prayerIdentified.body as { request?: { id?: string } })?.request?.id;
+if (identifiedPrayerId) prayerRequestIds.push(identifiedPrayerId);
 mark(
   {
     step: "POST /v1/prayer-requests cliente identificado",
@@ -233,13 +238,28 @@ const admin = createSupabaseAdminClient(env);
 if (admin) {
   const { data: prof } = await admin.from("profiles").select("id").eq("email", CLIENT_EMAIL).maybeSingle();
   const pid = (prof as { id?: string } | null)?.id;
+  const cleanupParts: Record<string, unknown> = { attempted: true };
   if (pid) {
     const del = await admin.from("match_events").delete().eq("client_profile_id", pid).gte("created_at", startedAt).select("id");
-    cleanup = { attempted: true, eventsDeleted: del.data?.length ?? 0, ok: !del.error };
+    cleanupParts.eventsDeleted = del.data?.length ?? 0;
+    cleanupParts.eventsOk = !del.error;
     ok &&= !del.error;
   }
+  if (prayerRequestIds.length > 0) {
+    const delPrayer = await admin.from("prayer_requests").delete().in("id", prayerRequestIds).select("id");
+    cleanupParts.prayerRequestsDeleted = delPrayer.data?.length ?? 0;
+    cleanupParts.prayerRequestsOk = !delPrayer.error;
+    ok &&= !delPrayer.error;
+  } else {
+    cleanupParts.prayerRequestsDeleted = 0;
+    cleanupParts.prayerRequestsOk = true;
+  }
+  cleanup = cleanupParts;
 } else {
-  cleanup = { attempted: false, reason: "service role local indisponivel (limpe match_events manualmente se necessario)" };
+  cleanup = {
+    attempted: false,
+    reason: "service role local indisponivel (limpe match_events/prayer_requests manualmente se necessario)"
+  };
 }
 
 console.log(JSON.stringify({ result: ok ? "OK" : "FALHOU", base: BASE, tokens: "REDACTED", steps, cleanup }, null, 2));

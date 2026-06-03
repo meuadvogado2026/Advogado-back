@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-03
-**Fase:** BACKEND / SPEC 008 PARTE 3 PUBLICADA
-**Veredito:** SPEC008_PARTE3_PUBLICADA_OK_COM_RESSALVAS
+**Fase:** BACKEND / SPEC 008 PARTE 3 RETENCAO ORACAO
+**Veredito:** SPEC008_PARTE3_RETENCAO_ORACAO_OK
 
 ## Producao (Railway)
 
@@ -10,7 +10,7 @@
 - Deploy via GitHub `meuadvogado2026/Advogado-back` (branch `main`), redeploy automatico a cada push.
 - Node 22 exigido (`engines`/`.nvmrc`): supabase-js/realtime quebra em Node 20 por falta de WebSocket nativo.
 - `PORT=8080` fixada nas Variables; demais envs (NODE_ENV=production, SUPABASE_URL/ANON/SERVICE_ROLE, GEOCODING_PROVIDER=nominatim) setadas no painel.
-- Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, 6 areas, match SP/civil matched, perfil cliente 200 com allowlist segura, perfil sem token 401, SP/criminal empty, match sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200, dashboard advogado 401/403/200 e prayer requests 401/403/422/201 sem ecoar texto; match_events do smoke limpos.
+- Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, 6 areas, match SP/civil matched, perfil cliente 200 com allowlist segura, perfil sem token 401, SP/criminal empty, match sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200, dashboard advogado 401/403/200 e prayer requests 401/403/422/201 sem ecoar texto; match_events e prayer_requests neutros do smoke limpos.
 - Parte 2 publicada na Railway apos push pela conta correta `meuadvogado2026`; checagem redigida confirmou campos visuais opcionais em `GET /v1/lawyers/:id` e `forbiddenFieldCount=0`.
 
 ## Concluido
@@ -54,6 +54,8 @@
 - [x] Migration aditiva `0003_prayer_requests.sql` versionada, validada por `npm run migration:check` e aplicada manualmente pelo usuario no Supabase SQL Editor aprovado.
 - [x] Harness backend passou em 2026-06-03 com typecheck, 45 testes, build, migration dry-run e smoke local.
 - [x] Spec 008 Parte 3 publicada apos aplicacao manual de `0003_prayer_requests.sql` no Supabase pelo usuario. Commit backend `a5db016` publicado no Railway; sonda sem credenciais retornou `401` nos endpoints novos; `npm run prod:smoke` contra Railway passou com dashboard advogado e prayer requests validados por role/status, sem ecoar texto.
+- [x] Retencao LGPD de `prayer_requests` implementada sem migration nova: `npm run retention:prayer-requests` roda em dry-run por padrao, usa retencao de 90 dias e exige `--apply` + `PRAYER_REQUESTS_RETENTION_CONFIRMATION=APPLY_PRAYER_REQUESTS_RETENTION` para expurgo destrutivo.
+- [x] `prod:smoke` ajustado para limpar os `prayer_requests` neutros criados pelo proprio smoke; smoke Railway passou com `prayerRequestsDeleted=2`, sem ecoar texto nem `clientProfileId`.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -101,10 +103,10 @@
 - CORS para `https://advogado20admin.vercel.app` esta validado em producao apos commit `844c048`; o smoke autenticado do admin publicado fechou com limpeza. Negativo nao-admin publicado segue pendente apenas se houver credencial segura desse perfil.
 - Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
-- `0003_prayer_requests.sql` foi aplicada manualmente no Supabase aprovado pelo usuario. Proxima lacuna backend e formalizar retencao operacional de `prayer_requests` antes de release externo amplo.
+- `0003_prayer_requests.sql` foi aplicada manualmente no Supabase aprovado pelo usuario. A retencao operacional de `prayer_requests` esta formalizada e testada; apply destrutivo real deve ocorrer somente em janela aprovada quando houver pedidos antigos elegiveis.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 
 ## Proximo Passo
 
-Parte 3 da spec 008 esta `SPEC008_PARTE3_PUBLICADA_OK_COM_RESSALVAS`: migration aplicada, backend publicado e smoke real dos endpoints de dashboard/oracao passou com tokens redigidos. Proximo gate backend recomendado: definir retencao/operacao de `prayer_requests` antes de release externo amplo. Apply destrutivo da spec 007 segue independente e somente com janela aprovada.
+Parte 3 da spec 008 esta `SPEC008_PARTE3_RETENCAO_ORACAO_OK`: migration aplicada, backend publicado, smoke real dos endpoints de dashboard/oracao passou com tokens redigidos, contrato de oracao nao ecoa texto e retencao/limpeza operacional de `prayer_requests` foi implementada/testada. Apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.

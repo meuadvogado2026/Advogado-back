@@ -192,6 +192,10 @@ Resposta `201`:
 Regras: `anonymous=true` persiste `client_profile_id = null`; `anonymous=false` persiste
 somente o profile id autenticado. A resposta nao ecoa o texto. Logs, harness e docs nao
 devem registrar texto do pedido, token, telefone completo, coordenada ou payload sensivel.
+Retencao operacional MVP: expurgo integral de `prayer_requests` antigos apos 90 dias via
+`npm run retention:prayer-requests`, com dry-run padrao e apply bloqueado por confirmacao
+explicita. O smoke de producao usa texto neutro e limpa os pedidos criados no proprio
+teste.
 
 ## Observacao Da Fundacao
 
