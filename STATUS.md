@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-03
-**Fase:** BACKEND / SPEC 008 PARTE 3 RETENCAO ORACAO
-**Veredito:** SPEC008_PARTE3_RETENCAO_ORACAO_OK
+**Fase:** BACKEND / SPEC 008 PARTE 3 RETENCAO ORACAO PUBLICADA
+**Veredito:** SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -56,6 +56,7 @@
 - [x] Spec 008 Parte 3 publicada apos aplicacao manual de `0003_prayer_requests.sql` no Supabase pelo usuario. Commit backend `a5db016` publicado no Railway; sonda sem credenciais retornou `401` nos endpoints novos; `npm run prod:smoke` contra Railway passou com dashboard advogado e prayer requests validados por role/status, sem ecoar texto.
 - [x] Retencao LGPD de `prayer_requests` implementada sem migration nova: `npm run retention:prayer-requests` roda em dry-run por padrao, usa retencao de 90 dias e exige `--apply` + `PRAYER_REQUESTS_RETENTION_CONFIRMATION=APPLY_PRAYER_REQUESTS_RETENTION` para expurgo destrutivo.
 - [x] `prod:smoke` ajustado para limpar os `prayer_requests` neutros criados pelo proprio smoke; smoke Railway passou com `prayerRequestsDeleted=2`, sem ecoar texto nem `clientProfileId`.
+- [x] Pacote de retencao de `prayer_requests` versionado e publicado no repo oficial pelo commit `5434baa` (`Implement prayer requests retention`); smoke Railway pos-push passou com limpeza de `match_events` e `prayer_requests` neutros criados no teste.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -109,4 +110,4 @@
 
 ## Proximo Passo
 
-Parte 3 da spec 008 esta `SPEC008_PARTE3_RETENCAO_ORACAO_OK`: migration aplicada, backend publicado, smoke real dos endpoints de dashboard/oracao passou com tokens redigidos, contrato de oracao nao ecoa texto e retencao/limpeza operacional de `prayer_requests` foi implementada/testada. Apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.
+Parte 3 da spec 008 esta `SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK`: migration aplicada, backend publicado, smoke real dos endpoints de dashboard/oracao passou com tokens redigidos, contrato de oracao nao ecoa texto e retencao/limpeza operacional de `prayer_requests` foi implementada/testada e versionada no repo oficial. Apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.
