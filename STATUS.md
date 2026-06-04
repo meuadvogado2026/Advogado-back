@@ -2,7 +2,7 @@
 
 **Ultima atualizacao:** 2026-06-04
 **Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO
-**Veredito:** PERFIL_ADVOGADO_SOCIAIS_LOCAL_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / QUESTIONAR_PUBLICACAO_SOCIAIS / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Veredito:** PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -15,8 +15,8 @@
 - Bugfix publicado no commit `60d90ce`: `POST /v1/match` nao retorna 500 se a persistencia de `match_events` falhar; a rota registra log sem coordenada/token e preserva a resposta para o cliente. `prod:smoke` pos-push passou contra Railway.
 - Cadastro cliente publicado no commit `45ec1dc`: `POST /v1/auth/signup-client` retornou `422` para payload invalido, `201` para usuario descartavel real, criou Supabase Auth + `profiles.role=client`, login Supabase Auth retornou `200`, `GET /v1/me` retornou `role=client` e cleanup de Auth/profile foi concluido sem expor senha, token ou service role.
 - Admin operacional ampliado publicado no commit `a0067c4`: `POST /v1/admin/lawyer-media`, `GET /v1/admin/prayer-requests`, `GET /v1/admin/users` e `PATCH /v1/admin/users/:id` publicados no Railway. Smoke publico validou `/health` `200`, endpoints admin novos sem token `401` e CORS `204` para Vercel; smoke autenticado assistido validou status persistente de advogado, upload de imagem, oracoes, usuarios e bloqueio/desbloqueio de usuario descartavel seguro com limpeza.
-- Localmente, `GET /v1/lawyers/:id` ganhou links sociais opcionais seguros (`instagramUrl`, `linkedinUrl`, `facebookUrl`, `websiteUrl`). Migrations `0005_admin_prayers_partners.sql` e `0006_lawyer_social_links.sql` ja foram aplicadas/verificadas no Supabase; producao ainda depende de publicar o backend para retornar os campos sociais.
-- Gate de publicacao social em 2026-06-04: `npm run harness` passou e `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke` voltou a passar apos aplicacao da `0005`; pronto para commit/push do backend social.
+- Perfil publico do advogado com redes sociais publicado no commit `c29d5db`: `GET /v1/lawyers/:id` retorna links sociais opcionais seguros (`instagramUrl`, `linkedinUrl`, `facebookUrl`, `websiteUrl`) na allowlist publica. Migrations `0005_admin_prayers_partners.sql` e `0006_lawyer_social_links.sql` aplicadas/verificadas no Supabase.
+- Gate final da publicacao social em 2026-06-04: `npm run harness` exit 0, Railway refletiu o commit novo com as chaves sociais no perfil publico e `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke` exit 0.
 
 ## Concluido
 
@@ -75,6 +75,7 @@
 - [x] Migration `0004_admin_users_blocking.sql` aplicada manualmente no Supabase aprovado; verificacao REST redigida confirmou `profiles.blocked_at` existente (`HTTP 200`, `blockedAtExists=true`) e `npm run migration:check` seguiu OK.
 - [x] Ciclo admin operacional ampliado publicado/validado em producao pelo commit backend `a0067c4`, com endpoints sem token retornando `401`, CORS Vercel OK e smoke autenticado assistido OK.
 - [x] Melhorias publicadas em 2026-06-04 pelo commit `1565c23`: `PATCH /v1/admin/lawyers/:id` atualiza dados completos e persiste cidade/UF do CEP; `PATCH /v1/admin/prayer-requests/:id` marca `read`/`received`; `GET/POST /v1/admin/partner-logos`, `POST /v1/admin/partner-logo-media` e `GET /v1/partner-logos` foram criados. Migration `0005_admin_prayers_partners.sql` versionada; backend `npm run harness` exit 0 e smoke publico basico `/health` retornou 200.
+- [x] Perfil do advogado com redes sociais publicado em 2026-06-04 pelo commit `c29d5db`; backend `npm run harness` exit 0 e `prod:smoke` Railway exit 0 apos aplicacao das migrations `0005` e `0006`.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -133,4 +134,4 @@
 
 ## Proximo Passo
 
-Publicar o pacote social do perfil do advogado no backend e repetir `prod:smoke` Railway pos-deploy. O pacote de edicao/oracao/parceiros esta destravado apos aplicacao da `0005` e `prod:smoke` OK.
+Perfil do advogado com redes sociais esta `PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK`. O pacote de edicao/oracao/parceiros esta destravado apos aplicacao da `0005` e `prod:smoke` OK.
