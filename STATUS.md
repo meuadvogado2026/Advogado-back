@@ -1,10 +1,10 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-04
-**Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO / SPEC010 LOCAL
-**Veredito:** SPEC010_BACKEND_LOCAL_OK_COM_RESSALVAS / PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO / SPEC010 PUBLICADA
+**Veredito:** SPEC010_BACKEND_PUBLICADO_OK / PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
-- [x] Spec 010 backend local em 2026-06-04: `GET /v1/lawyers/:id` passou a aceitar role `lawyer` com a mesma allowlist publica segura; `POST /v1/prayer-requests` passou a aceitar role `lawyer`, sem ecoar texto nem `clientProfileId`. Gates locais: `npm run harness` exit 0 com 65 testes, build, migration dry-run e smoke local. Lacuna: publicacao Railway e `prod:smoke` pos-deploy ainda pendentes.
+- [x] Spec 010 backend publicada em 2026-06-04 no commit `777dd5b`: `GET /v1/lawyers/:id` passou a aceitar role `lawyer` com a mesma allowlist publica segura; `POST /v1/prayer-requests` passou a aceitar role `lawyer`, sem ecoar texto nem `clientProfileId`. Gates: `npm run harness` exit 0 com 65 testes, build, migration dry-run e smoke local; Railway `prod:smoke` exit 0 validou oracao advogado `201`, admin `403`, cliente `201` e limpeza de 3 pedidos neutros.
 - [x] Ajuste publicado em 2026-06-04 no commit `ac06577`: resposta `matched` de `POST /v1/match` passou a incluir `avatarUrl` e `coverUrl` opcionais do advogado indicado, preservando a allowlist sem CEP/endereco/coordenada/email interno. `GET /v1/partner-logos` segue publico para o rodape mobile. Gates: `npm run test`, `npm run smoke` e `npm run harness` exit 0.
 
 ## Producao (Railway)
