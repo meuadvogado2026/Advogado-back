@@ -262,7 +262,7 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 // Inclui office_lat/office_lng para refletir a coordenada persistida no escritorio.
 const LAWYER_COLUMNS =
-  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, office_cep, office_number, office_city, office_state, office_lat, office_lng, created_at, updated_at";
+  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_cep, office_number, office_city, office_state, office_lat, office_lng, created_at, updated_at";
 
 type LawyerRow = {
   id: string;
@@ -273,6 +273,10 @@ type LawyerRow = {
   whatsapp: string;
   mini_bio: string | null;
   full_bio: string | null;
+  instagram_url: string | null;
+  linkedin_url: string | null;
+  facebook_url: string | null;
+  website_url: string | null;
   office_cep: string;
   office_number: string;
   office_city: string | null;
@@ -323,6 +327,10 @@ class SupabaseLawyerRepository implements LawyerRepository {
       whatsapp: row.whatsapp,
       miniBio: row.mini_bio,
       fullBio: row.full_bio,
+      instagramUrl: row.instagram_url,
+      linkedinUrl: row.linkedin_url,
+      facebookUrl: row.facebook_url,
+      websiteUrl: row.website_url,
       oabNumber: row.oab_number,
       oabState: row.oab_state,
       mainAreaId: "",
@@ -417,6 +425,10 @@ class SupabaseLawyerRepository implements LawyerRepository {
       whatsapp: input.whatsapp,
       mini_bio: input.miniBio ?? null,
       full_bio: input.fullBio ?? null,
+      instagram_url: input.instagramUrl ?? null,
+      linkedin_url: input.linkedinUrl ?? null,
+      facebook_url: input.facebookUrl ?? null,
+      website_url: input.websiteUrl ?? null,
       office_cep: input.officeCep.replace(/\D/g, ""),
       office_number: input.officeNumber
     };
@@ -474,6 +486,10 @@ class SupabaseLawyerRepository implements LawyerRepository {
     if (patch.whatsapp) updatePayload.whatsapp = patch.whatsapp;
     if (patch.miniBio !== undefined) updatePayload.mini_bio = patch.miniBio;
     if (patch.fullBio !== undefined) updatePayload.full_bio = patch.fullBio;
+    if (patch.instagramUrl !== undefined) updatePayload.instagram_url = patch.instagramUrl;
+    if (patch.linkedinUrl !== undefined) updatePayload.linkedin_url = patch.linkedinUrl;
+    if (patch.facebookUrl !== undefined) updatePayload.facebook_url = patch.facebookUrl;
+    if (patch.websiteUrl !== undefined) updatePayload.website_url = patch.websiteUrl;
     if (patch.officeCep) updatePayload.office_cep = patch.officeCep.replace(/\D/g, "");
     if (patch.officeNumber) updatePayload.office_number = patch.officeNumber;
     if (location?.address) {
@@ -531,6 +547,10 @@ type PublicLawyerProfileRow = {
   whatsapp: string;
   mini_bio: string | null;
   full_bio: string | null;
+  instagram_url: string | null;
+  linkedin_url: string | null;
+  facebook_url: string | null;
+  website_url: string | null;
   office_city: string | null;
   office_state: string | null;
   profiles: { name: string; avatar_url: string | null; cover_url: string | null } | Array<{ name: string; avatar_url: string | null; cover_url: string | null }>;
@@ -555,7 +575,7 @@ class SupabasePublicLawyerProfileRepository implements PublicLawyerProfileReposi
     const { data, error } = await this.supabase
       .from("lawyer_profiles")
       .select(
-        "id, oab_number, oab_state, whatsapp, mini_bio, full_bio, office_city, office_state, profiles!inner(name, avatar_url, cover_url), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
+        "id, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_city, office_state, profiles!inner(name, avatar_url, cover_url), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
       )
       .eq("id", id)
       .eq("status", "approved")
@@ -581,6 +601,10 @@ class SupabasePublicLawyerProfileRepository implements PublicLawyerProfileReposi
       coverUrl: profile.cover_url,
       miniBio: row.mini_bio,
       fullBio: row.full_bio,
+      instagramUrl: row.instagram_url,
+      linkedinUrl: row.linkedin_url,
+      facebookUrl: row.facebook_url,
+      websiteUrl: row.website_url,
       yearsExperience: null,
       planLabel: null,
       emergencyAvailable: false

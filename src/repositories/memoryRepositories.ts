@@ -244,6 +244,10 @@ type MatchFixture = {
   coverUrl?: string | null;
   miniBio?: string | null;
   fullBio?: string | null;
+  instagramUrl?: string | null;
+  linkedinUrl?: string | null;
+  facebookUrl?: string | null;
+  websiteUrl?: string | null;
 };
 
 /**
@@ -268,6 +272,10 @@ const matchFixtures: MatchFixture[] = [
     coverUrl: "https://example.test/ana-cover.jpg",
     miniBio: "Atuacao consultiva em direito civil.",
     fullBio: "Perfil profissional aprovado para testes de contrato publico seguro.",
+    instagramUrl: "https://instagram.com/draanageo",
+    linkedinUrl: "https://www.linkedin.com/in/draanageo",
+    facebookUrl: "https://www.facebook.com/draanageo",
+    websiteUrl: "https://example.test/draanageo"
   },
   {
     id: "fixture-lawyer-rj",
@@ -363,6 +371,10 @@ class MemoryPublicLawyerProfileRepository implements PublicLawyerProfileReposito
       coverUrl: fixture.coverUrl ?? null,
       miniBio: fixture.miniBio ?? null,
       fullBio: fixture.fullBio ?? null,
+      instagramUrl: fixture.instagramUrl ?? null,
+      linkedinUrl: fixture.linkedinUrl ?? null,
+      facebookUrl: fixture.facebookUrl ?? null,
+      websiteUrl: fixture.websiteUrl ?? null,
       yearsExperience: null,
       planLabel: null,
       emergencyAvailable: false

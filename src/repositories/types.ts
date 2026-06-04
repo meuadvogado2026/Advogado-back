@@ -104,6 +104,10 @@ export type PublicLawyerProfile = {
   coverUrl?: string | null;
   miniBio?: string | null;
   fullBio?: string | null;
+  instagramUrl?: string | null;
+  linkedinUrl?: string | null;
+  facebookUrl?: string | null;
+  websiteUrl?: string | null;
   yearsExperience?: number | null;
   planLabel?: string | null;
   emergencyAvailable?: boolean;

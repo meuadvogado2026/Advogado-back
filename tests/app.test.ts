@@ -213,6 +213,10 @@ describe("foundation API", () => {
         coverUrl: "https://example.test/ana-cover.jpg",
         miniBio: "Atuacao consultiva em direito civil.",
         fullBio: "Perfil profissional aprovado para testes de contrato publico seguro.",
+        instagramUrl: "https://instagram.com/draanageo",
+        linkedinUrl: "https://www.linkedin.com/in/draanageo",
+        facebookUrl: "https://www.facebook.com/draanageo",
+        websiteUrl: "https://example.test/draanageo",
         yearsExperience: null,
         planLabel: null,
         emergencyAvailable: false
@@ -240,6 +244,7 @@ describe("foundation API", () => {
         officeCep: "01001-000",
         officeNumber: "200",
         avatarUrl: "http://example.test/avatar.jpg",
+        instagramUrl: "http://instagram.com/inseguro",
         status: "draft"
       }
     });
@@ -247,6 +252,7 @@ describe("foundation API", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json().lawyer.avatarUrl).toBeNull();
+    expect(response.json().lawyer.instagramUrl).toBeNull();
   });
 
   it("keeps areas public", async () => {
@@ -537,6 +543,8 @@ describe("foundation API", () => {
         officeCep: "01001-000",
         officeNumber: "300",
         miniBio: "Perfil editado pelo admin.",
+        instagramUrl: "https://instagram.com/editado",
+        linkedinUrl: "https://www.linkedin.com/in/editado",
         status: "pending_review"
       }
     });
@@ -551,6 +559,8 @@ describe("foundation API", () => {
       officeState: expect.any(String),
       mainAreaId: "trabalhista",
       miniBio: "Perfil editado pelo admin.",
+      instagramUrl: "https://instagram.com/editado",
+      linkedinUrl: "https://www.linkedin.com/in/editado"
     });
   });
 

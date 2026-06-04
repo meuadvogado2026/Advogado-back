@@ -39,6 +39,10 @@ export const lawyerCreateSchema = z.object({
   coverUrl: safeHttpsUrlSchema.optional(),
   miniBio: z.string().trim().max(240).nullable().optional(),
   fullBio: z.string().trim().max(1200).nullable().optional(),
+  instagramUrl: safeHttpsUrlSchema.optional(),
+  linkedinUrl: safeHttpsUrlSchema.optional(),
+  facebookUrl: safeHttpsUrlSchema.optional(),
+  websiteUrl: safeHttpsUrlSchema.optional(),
   status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).default("draft")
 });
 
