@@ -10,10 +10,11 @@ import { registerLawyerProfileRoutes } from "./modules/lawyerProfiles/routes.js"
 import { registerMatchRoutes } from "./modules/match/routes.js";
 import { registerSpec008Routes } from "./modules/spec008/routes.js";
 import { createRepositories } from "./repositories/index.js";
+import type { Repositories } from "./repositories/types.js";
 
-export async function buildApp() {
+export async function buildApp(repositoriesOverride?: Repositories) {
   const env = loadEnv();
-  const repositories = createRepositories(env);
+  const repositories = repositoriesOverride ?? createRepositories(env);
   const app = Fastify({
     logger: env.NODE_ENV === "production"
   });

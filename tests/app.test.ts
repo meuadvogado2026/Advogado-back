@@ -97,6 +97,28 @@ describe("foundation API", () => {
     expect(body.lawyer.officeCep).toBeUndefined();
   });
 
+  it("keeps match response available when event recording fails", async () => {
+    const repos = createMemoryRepositories();
+    repos.matchEvents.record = async () => {
+      throw new Error("event persistence unavailable");
+    };
+    const app = await buildApp(repos);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/match",
+      headers: CLIENT,
+      payload: { lat: -23.55052, lng: -46.633308, accuracyM: 30, areaIds: ["civil"] }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "matched",
+      lawyer: { whatsapp: expect.any(String) },
+      algorithmVersion: "geo-nearest-v1"
+    });
+  });
+
   it("returns empty when no lawyer serves the area", async () => {
     const app = await buildApp();
     const response = await app.inject({

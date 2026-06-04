@@ -34,16 +34,28 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
     });
 
     // Evento de match: coordenada vai para o banco (auditoria/produto), nunca para logs.
-    await repositories.matchEvents.record({
-      clientProfileId: request.currentUser?.id,
-      lawyerProfileId: nearest?.lawyer.id,
-      lat,
-      lng,
-      accuracyM,
-      specialtyIds: areaIds,
-      distanceKm: nearest?.distanceKm,
-      algorithmVersion: ALGORITHM_VERSION
-    });
+    // Se a persistencia do evento falhar, o usuario ainda deve receber o resultado do match.
+    try {
+      await repositories.matchEvents.record({
+        clientProfileId: request.currentUser?.id,
+        lawyerProfileId: nearest?.lawyer.id,
+        lat,
+        lng,
+        accuracyM,
+        specialtyIds: areaIds,
+        distanceKm: nearest?.distanceKm,
+        algorithmVersion: ALGORITHM_VERSION
+      });
+    } catch (error) {
+      request.log.warn(
+        {
+          err: error,
+          hasMatchedLawyer: Boolean(nearest),
+          algorithmVersion: ALGORITHM_VERSION
+        },
+        "match_event_record_failed"
+      );
+    }
 
     if (!nearest) {
       return reply.code(200).send({ status: "empty", lawyer: null, algorithmVersion: ALGORITHM_VERSION });
