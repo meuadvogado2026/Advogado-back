@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
-**Ultima atualizacao:** 2026-06-03
-**Fase:** BACKEND / CADASTRO CLIENTE MOBILE
-**Veredito:** CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Ultima atualizacao:** 2026-06-04
+**Fase:** BACKEND / CADASTRO CLIENTE EM PRODUCAO
+**Veredito:** CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -13,6 +13,7 @@
 - Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, 6 areas, match SP/civil matched, perfil cliente 200 com allowlist segura, perfil sem token 401, SP/criminal empty, match sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200, dashboard advogado 401/403/200 e prayer requests 401/403/422/201 sem ecoar texto; match_events e prayer_requests neutros do smoke limpos.
 - Parte 2 publicada na Railway apos push pela conta correta `meuadvogado2026`; checagem redigida confirmou campos visuais opcionais em `GET /v1/lawyers/:id` e `forbiddenFieldCount=0`.
 - Bugfix publicado no commit `60d90ce`: `POST /v1/match` nao retorna 500 se a persistencia de `match_events` falhar; a rota registra log sem coordenada/token e preserva a resposta para o cliente. `prod:smoke` pos-push passou contra Railway.
+- Cadastro cliente publicado no commit `45ec1dc`: `POST /v1/auth/signup-client` retornou `422` para payload invalido, `201` para usuario descartavel real, criou Supabase Auth + `profiles.role=client`, login Supabase Auth retornou `200`, `GET /v1/me` retornou `role=client` e cleanup de Auth/profile foi concluido sem expor senha, token ou service role.
 
 ## Concluido
 
@@ -41,7 +42,7 @@
 - [x] Admin real validado com `200` em rota admin; advogado e cliente validados com `403`.
 - [x] Ambiente backend passou a ser governado pela `.codex/` unica da raiz; copia local `Meu Advogado 2.0 - back/.codex` removida.
 - [x] Spec 006: `GET /v1/me` implementado para retornar identidade/role segura (`id`, `email`, `role`) sem token/service role/payload sensivel.
-- [x] `POST /v1/auth/signup-client` implementado localmente para cadastro publico de cliente: cria Supabase Auth via service role server-side, cria `profiles.role=client` com mesmo id e responde sem senha/token/segredo. Em modo memory, contrato e smoke passam sem Supabase real.
+- [x] `POST /v1/auth/signup-client` implementado e publicado para cadastro publico de cliente: cria Supabase Auth via service role server-side, cria `profiles.role=client` com mesmo id e responde sem senha/token/segredo. Em modo memory, contrato e smoke passam sem Supabase real; em producao Railway, smoke real passou com cadastro descartavel, login, `/v1/me` e cleanup.
 - [x] Spec 007: mecanismo backend de retencao de `match_events` implementado com comando `npm run retention:match-events`, dry-run padrao, retencao de 90 dias e apply bloqueado por confirmacao explicita.
 - [x] Checagem publica Railway sem credenciais executada antes do redeploy para admin producao: `/health` `200`, `/v1/areas` `200`, `/v1/admin/lawyers` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, mas `GET /v1/me` retornou `404`.
 - [x] Commit backend `e621676` publicado no GitHub/Railway com `GET /v1/me` e fallback CORS de producao no codigo.
@@ -114,7 +115,7 @@
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 - Spec 009 backend ainda precisa publicacao Railway e smoke proporcional pos-deploy junto com o admin Vercel.
-- `POST /v1/auth/signup-client` ainda precisa publicacao Railway para o cadastro funcionar em APK/ambiente mobile apontado para producao.
+- Cadastro cliente esta publicado e validado no backend Railway. Se o APK/mobile em uso nao contiver a UI nova, o rebuild/publicacao mobile deve ocorrer em ciclo separado.
 
 ## Proximo Passo
 
