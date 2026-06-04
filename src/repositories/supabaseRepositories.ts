@@ -658,6 +658,24 @@ class SupabaseMatchRepository implements MatchRepository {
     const row = (data as MatchNearestRow[] | null)?.[0];
     if (!row) return null;
 
+    const { data: lawyerData, error: lawyerError } = await this.supabase
+      .from("lawyer_profiles")
+      .select("profile_id")
+      .eq("id", row.lawyer_profile_id)
+      .maybeSingle();
+    assertSupabaseOk(lawyerError, "match.findNearestProfileId");
+    const profileId = (lawyerData as { profile_id?: string } | null)?.profile_id;
+
+    const { data: profileData, error: profileError } = profileId
+      ? await this.supabase
+          .from("profiles")
+          .select("avatar_url, cover_url")
+          .eq("id", profileId)
+          .maybeSingle()
+      : { data: null, error: null };
+    assertSupabaseOk(profileError, "match.findNearestVisuals");
+    const profile = profileData as { avatar_url: string | null; cover_url: string | null } | null;
+
     return {
       lawyer: {
         id: row.lawyer_profile_id,
@@ -665,7 +683,9 @@ class SupabaseMatchRepository implements MatchRepository {
         whatsapp: row.whatsapp,
         city: row.office_city,
         state: row.office_state,
-        areaIds: row.area_ids ?? []
+        areaIds: row.area_ids ?? [],
+        avatarUrl: profile?.avatar_url ?? null,
+        coverUrl: profile?.cover_url ?? null
       },
       distanceKm: Number(row.distance_km)
     };

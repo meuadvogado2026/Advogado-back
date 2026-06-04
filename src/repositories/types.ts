@@ -226,6 +226,8 @@ export type MatchedLawyer = {
   city: string | null;
   state: string | null;
   areaIds: string[];
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
 };
 
 export type NearestLawyerResult = {

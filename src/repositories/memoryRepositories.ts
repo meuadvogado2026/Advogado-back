@@ -341,7 +341,9 @@ class MemoryMatchRepository implements MatchRepository {
         whatsapp: candidate.fixture.whatsapp,
         city: candidate.fixture.city,
         state: candidate.fixture.state,
-        areaIds: candidate.fixture.areaIds
+        areaIds: candidate.fixture.areaIds,
+        avatarUrl: candidate.fixture.avatarUrl ?? null,
+        coverUrl: candidate.fixture.coverUrl ?? null
       },
       distanceKm: candidate.distanceKm
     };

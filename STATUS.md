@@ -4,6 +4,8 @@
 **Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO
 **Veredito:** PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
+- [x] Ajuste local em 2026-06-04: resposta `matched` de `POST /v1/match` passou a incluir `avatarUrl` e `coverUrl` opcionais do advogado indicado, preservando a allowlist sem CEP/endereco/coordenada/email interno. `GET /v1/partner-logos` segue publico para o rodape mobile. Gates: `npm run test`, `npm run smoke` e `npm run harness` exit 0.
+
 ## Producao (Railway)
 
 - URL publica: `https://advogado-back-production.up.railway.app` (HTTPS).
@@ -90,7 +92,7 @@
 - [x] `migration:check` ajustado para iterar/validar todas as migrations de `src/db/migrations/` em ordem (0001 + 0002) e listar seeds de `src/db/seeds/`, mantendo dry-run estatico e apply remoto bloqueado por padrao.
 - [x] Filtro de elegibilidade: `approved` + `office_location` + area compativel; raio via `MATCH_MAX_RADIUS_KM` (default 200km).
 - [x] Evento de match grava coordenada no banco, nunca em logs (LGPD).
-- [x] Testes 401/422/matched/empty/fora-do-raio passando; harness exit code 0; smoke valida matched (2.6km) e empty.
+- [x] Testes 401/422/matched/empty/fora-do-raio passando; harness exit code 0; smoke valida matched (2.6km) com foto/capa e empty.
 - [x] `0002_match_nearest.sql` + seed `001_match_fixtures.sql` aplicados manualmente no Supabase SQL Editor (Success).
 - [x] Fixture adicional Dra. Carla Lima (Brasilia/Samambaia Sul, CEP 72309601, civil+familia) versionado no seed e aplicado.
 

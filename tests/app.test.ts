@@ -92,6 +92,8 @@ describe("foundation API", () => {
     expect(body.status).toBe("matched");
     expect(body.algorithmVersion).toBe("geo-nearest-v1");
     expect(body.lawyer.whatsapp).toBeTruthy();
+    expect(body.lawyer.avatarUrl).toBe("https://example.test/ana-avatar.jpg");
+    expect(body.lawyer.coverUrl).toBe("https://example.test/ana-cover.jpg");
     expect(typeof body.distanceKm).toBe("number");
     // Nao deve vazar PII interna (CEP/endereco completo).
     expect(body.lawyer.officeCep).toBeUndefined();

@@ -18,7 +18,7 @@
 - `GET /v1/areas`
 - `POST /v1/match` - exige Bearer token (`client` ou `admin`); ver contrato abaixo
 - `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client` ou `admin`)
-- `GET /v1/partner-logos` - lista publica segura de logos ativas para rodape futuro do mobile
+- `GET /v1/partner-logos` - lista publica segura de logos ativas para rodape da Home mobile
 - `POST /v1/prayer-requests` - implementado na spec 008 Parte 3; exige Bearer token `client`
 - `POST /v1/lawyers/:id/events`
 - `POST /v1/lawyers/:id/urgent-calls`
@@ -113,7 +113,7 @@ visivel apenas para admin autenticado e nao e ecoado na rota publica de envio.
 `POST /v1/admin/partner-logo-media` recebe `{ "kind": "partnerLogo", "fileName": "...", "mimeType": "image/png", "base64Data": "..." }`,
 aceita JPG/PNG/WebP ate 2MB e retorna URL publica segura. `POST /v1/admin/partner-logos`
 salva `{ "name": "...", "logoUrl": "https://...", "websiteUrl": null, "active": true }`.
-`GET /v1/partner-logos` retorna somente parceiros ativos para consumo futuro no mobile.
+`GET /v1/partner-logos` retorna somente parceiros ativos para consumo no rodape da Home mobile.
 
 `GET /v1/admin/users` retorna usuarios cadastrados com identidade operacional,
 role, telefone opcional, status de bloqueio e vinculo de advogado quando existir.
@@ -160,7 +160,16 @@ Resposta `matched` (`200`):
 ```json
 {
   "status": "matched",
-  "lawyer": { "id": "...", "name": "...", "whatsapp": "...", "city": "...", "state": "...", "areaIds": ["..."] },
+  "lawyer": {
+    "id": "...",
+    "name": "...",
+    "whatsapp": "...",
+    "city": "...",
+    "state": "...",
+    "areaIds": ["..."],
+    "avatarUrl": "https://cdn.example.com/avatar.jpg",
+    "coverUrl": "https://cdn.example.com/capa.jpg"
+  },
   "distanceKm": 2.6,
   "algorithmVersion": "geo-nearest-v1"
 }
@@ -176,7 +185,7 @@ Regras:
 
 - Elegivel: advogado `approved`, com `office_location` e area compativel.
 - Ordenado por distancia (PostGIS `ST_Distance`); raio maximo via `MATCH_MAX_RADIUS_KM` (default 200km).
-- `lawyer` expoe apenas campos seguros; nunca CEP/endereco completo nem PII interna.
+- `lawyer` expoe apenas campos seguros; inclui `avatarUrl`/`coverUrl` HTTPS opcionais para a Home mobile e nunca CEP/endereco completo nem PII interna.
 - Evento gravado em `match_events`; coordenada vai para o banco, nunca para logs.
 - Spec 007 implementa a politica alvo de retencao: expurgo integral de eventos antigos apos 90 dias no MVP via `npm run retention:match-events`, com dry-run padrao e apply bloqueado por confirmacao explicita.
 

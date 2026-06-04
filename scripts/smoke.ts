@@ -57,6 +57,9 @@ const adminWithoutToken = await app.inject({ method: "GET", url: "/v1/admin/lawy
 await app.close();
 
 const matchedOk = matchMatched.statusCode === 200 && matchMatched.json().status === "matched";
+const matchedVisualsOk =
+  matchMatched.json().lawyer?.avatarUrl === "https://example.test/ana-avatar.jpg" &&
+  matchMatched.json().lawyer?.coverUrl === "https://example.test/ana-cover.jpg";
 const emptyOk = matchEmpty.statusCode === 200 && matchEmpty.json().status === "empty";
 const lawyerProfileOk =
   lawyerProfileApproved.statusCode === 200 &&
@@ -71,6 +74,7 @@ if (
   clientSignup.json().user?.token !== undefined ||
   matchNoToken.statusCode !== 401 ||
   !matchedOk ||
+  !matchedVisualsOk ||
   !emptyOk ||
   lawyerProfileNoToken.statusCode !== 401 ||
   lawyerProfileForbidden.statusCode !== 403 ||
@@ -81,6 +85,7 @@ if (
   throw new Error(
     `Smoke falhou: health=${health.statusCode}, areas=${areas.statusCode}, ` +
       `signup=${clientSignup.statusCode}, matchNoToken=${matchNoToken.statusCode}, matched=${matchMatched.statusCode}/${matchMatched.json().status}, ` +
+      `matchVisuals=${matchedVisualsOk}, ` +
       `empty=${matchEmpty.statusCode}/${matchEmpty.json().status}, ` +
       `lawyerProfile=${lawyerProfileNoToken.statusCode}/${lawyerProfileForbidden.statusCode}/${lawyerProfileUnavailable.statusCode}/${lawyerProfileApproved.statusCode}, ` +
       `admin401=${adminWithoutToken.statusCode}`
@@ -90,6 +95,6 @@ if (
 console.log(
   `Smoke backend OK: /health, /v1/areas, match sem token=401, ` +
     `signup cliente publico sem token/senha na resposta, ` +
-    `matched (${matchMatched.json().distanceKm}km) e empty validados, ` +
+    `matched (${matchMatched.json().distanceKm}km) com foto/capa e empty validados, ` +
     `perfil advogado 401/403/404/200, admin sem token=401.`
 );

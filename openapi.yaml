@@ -74,6 +74,45 @@ paths:
       responses:
         "200":
           description: Resultado matched ou empty
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, lawyer, algorithmVersion]
+                properties:
+                  status:
+                    type: string
+                    enum: [matched, empty]
+                  lawyer:
+                    anyOf:
+                      - type: "null"
+                      - type: object
+                        required: [id, name, whatsapp, city, state, areaIds]
+                        properties:
+                          id:
+                            type: string
+                          name:
+                            type: string
+                          whatsapp:
+                            type: string
+                          city:
+                            type: [string, "null"]
+                          state:
+                            type: [string, "null"]
+                          areaIds:
+                            type: array
+                            items:
+                              type: string
+                          avatarUrl:
+                            type: [string, "null"]
+                            format: uri
+                          coverUrl:
+                            type: [string, "null"]
+                            format: uri
+                  distanceKm:
+                    type: number
+                  algorithmVersion:
+                    type: string
         "401":
           description: Token ausente ou invalido
         "403":
