@@ -97,11 +97,32 @@ describe("NominatimGeocodingProvider.geocodeAddress", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back to city and state centroid when the full address has no results", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([{ lat: "-23.55052", lon: "-46.633308", addresstype: "city" }]));
+    const provider = buildProvider(fetchImpl as unknown as typeof fetch);
+
+    const coordinates = await provider.geocodeAddress(address);
+
+    expect(coordinates).toMatchObject({
+      lat: -23.55052,
+      lng: -46.633308,
+      provider: "nominatim",
+      precision: "cep_centroid",
+      confidence: "low"
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl.mock.calls[1]?.[0]).toContain("Sao%20Paulo%2C%20SP%2C%20Brasil");
+  });
+
   it("returns address_not_geocoded when nominatim has no results", async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse([]));
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse([])).mockResolvedValueOnce(jsonResponse([]));
     const provider = buildProvider(fetchImpl as unknown as typeof fetch);
 
     await expect(provider.geocodeAddress(address)).rejects.toMatchObject({ reason: "address_not_geocoded" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it("maps a non-ok response to provider_unavailable", async () => {

@@ -240,48 +240,57 @@ export class NominatimGeocodingProvider implements GeocodingProvider {
     const cached = this.coordCache.get(cacheKey);
     if (cached) return cached;
 
-    const query = [address.street, address.neighborhood, address.city, address.state, "Brasil"]
+    const queries: Array<{ query: string; precision: Coordinates["precision"] }> = [];
+    const streetQuery = [address.street, address.neighborhood, address.city, address.state, "Brasil"]
       .filter((part) => part.length > 0)
       .join(", ");
-    const url = `${this.nominatimBaseUrl}/search?format=jsonv2&limit=1&countrycodes=br&q=${encodeURIComponent(query)}`;
-
-    let response: Response;
-    try {
-      response = await this.limiter.schedule(() =>
-        this.fetchImpl(url, {
-          headers: { accept: "application/json", "user-agent": this.userAgent },
-          signal: AbortSignal.timeout(this.timeoutMs)
-        })
-      );
-    } catch {
-      throw new GeocodingError("provider_unavailable", "Servico de geocoding indisponivel.");
+    const cityQuery = [address.city, address.state, "Brasil"].filter((part) => part.length > 0).join(", ");
+    if (address.street || address.neighborhood) {
+      queries.push({ query: streetQuery, precision: "street" });
+    }
+    if (cityQuery && cityQuery !== streetQuery) {
+      queries.push({ query: cityQuery, precision: "cep_centroid" });
     }
 
-    if (!response.ok) {
-      throw new GeocodingError("provider_unavailable", "Servico de geocoding indisponivel.");
+    for (const { query, precision } of queries) {
+      const url = `${this.nominatimBaseUrl}/search?format=jsonv2&limit=1&countrycodes=br&q=${encodeURIComponent(query)}`;
+
+      let response: Response;
+      try {
+        response = await this.limiter.schedule(() =>
+          this.fetchImpl(url, {
+            headers: { accept: "application/json", "user-agent": this.userAgent },
+            signal: AbortSignal.timeout(this.timeoutMs)
+          })
+        );
+      } catch {
+        throw new GeocodingError("provider_unavailable", "Servico de geocoding indisponivel.");
+      }
+
+      if (!response.ok) {
+        throw new GeocodingError("provider_unavailable", "Servico de geocoding indisponivel.");
+      }
+
+      const results = (await response.json()) as NominatimResult[];
+      const top = Array.isArray(results) ? results[0] : undefined;
+      if (!top) continue;
+
+      const lat = Number(top.lat);
+      const lng = Number(top.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+      const coordinates: Coordinates = {
+        lat,
+        lng,
+        provider: "nominatim",
+        precision,
+        confidence: confidenceFromNominatim(top)
+      };
+      this.coordCache.set(cacheKey, coordinates);
+      return coordinates;
     }
 
-    const results = (await response.json()) as NominatimResult[];
-    const top = Array.isArray(results) ? results[0] : undefined;
-    if (!top) {
-      throw new GeocodingError("address_not_geocoded", "Endereco nao geocodificado.");
-    }
-
-    const lat = Number(top.lat);
-    const lng = Number(top.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      throw new GeocodingError("address_not_geocoded", "Coordenada invalida retornada pelo provider.");
-    }
-
-    const coordinates: Coordinates = {
-      lat,
-      lng,
-      provider: "nominatim",
-      precision: address.street ? "street" : "cep_centroid",
-      confidence: confidenceFromNominatim(top)
-    };
-    this.coordCache.set(cacheKey, coordinates);
-    return coordinates;
+    throw new GeocodingError("address_not_geocoded", "Endereco nao geocodificado.");
   }
 }
 
