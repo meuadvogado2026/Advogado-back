@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-04
-**Fase:** BACKEND / CADASTRO CLIENTE EM PRODUCAO
-**Veredito:** CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Fase:** BACKEND / MIGRATION 0004 APLICADA
+**Veredito:** MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -64,6 +64,10 @@
 - [x] Harness backend da spec 009 passou com exit code 0: typecheck, 51 testes, build, migration dry-run e smoke local.
 - [x] Bugfix do match publicado: falha de `match_events.record` nao bloqueia `matched`/`empty`; teste de regressao adicionado, harness backend exit 0 e `prod:smoke` Railway exit 0.
 - [x] Harness backend do cadastro cliente passou em 2026-06-03: typecheck, 55 testes, build, migration dry-run e smoke local com signup publico sem token/senha na resposta.
+- [x] Ciclo admin operacional ampliado implementado localmente: `POST /v1/admin/lawyer-media`, `GET /v1/admin/prayer-requests`, `GET /v1/admin/users` e `PATCH /v1/admin/users/:id`.
+- [x] Migration aditiva `0004_admin_users_blocking.sql` versionada para `profiles.blocked_at`; auth real passa a rejeitar usuario bloqueado com `403`.
+- [x] Status do advogado coberto por regressao: `PATCH /v1/admin/lawyers/:id` persiste a escolha e `GET /v1/admin/lawyers` reflete o status atualizado.
+- [x] Harness backend do ciclo ampliado passou com exit 0: typecheck, 60 testes, build, migration dry-run incluindo `0004` e smoke local.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -103,6 +107,7 @@
 - [ ] Executar apply remoto real da spec 007 somente quando houver janela aprovada e necessidade operacional.
 - [x] Apoiar spec 006 com contrato seguro de perfil/role (`GET /v1/me`) e harness backend exit 0.
 - [x] Apoiar spec 008 Parte 3 localmente com dashboard advogado e pedido de oracao.
+- [x] Apoiar painel admin com midia, oracoes e usuarios.
 
 ## Bloqueios
 
@@ -112,6 +117,7 @@
 - Apply destrutivo da spec 007 nao foi executado; comando exige `--apply` e `MATCH_EVENTS_RETENTION_CONFIRMATION=APPLY_MATCH_EVENTS_RETENTION`.
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
 - `0003_prayer_requests.sql` foi aplicada manualmente no Supabase aprovado pelo usuario. A retencao operacional de `prayer_requests` esta formalizada e testada; apply destrutivo real deve ocorrer somente em janela aprovada quando houver pedidos antigos elegiveis.
+- `0004_admin_users_blocking.sql` aplicada manualmente pelo usuario no Supabase SQL Editor aprovado; verificacao REST redigida confirmou `profiles.blocked_at` existente (`200`, `blockedAtExists=true`).
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 - Spec 009 backend ainda precisa publicacao Railway e smoke proporcional pos-deploy junto com o admin Vercel.
@@ -119,4 +125,4 @@
 
 ## Proximo Passo
 
-Spec 009 backend esta `ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK` em ambiente local controlado com Supabase real; proximo gate e publicar backend/admin e repetir smoke proporcional no Vercel/Railway. Parte 3 da spec 008 segue `SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK`; apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.
+Backend do admin operacional ampliado esta `ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_LOCAL_OK` e a migration `0004` esta aplicada. Proximo gate: publicar backend/admin e repetir smoke proporcional no Vercel/Railway. Parte 3 da spec 008 segue `SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK`; apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.

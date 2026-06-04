@@ -2,9 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LawyerCreate, LawyerPatch } from "../contracts/api.js";
 import type {
   AuditLogRepository,
+  AdminPrayerRequestRecord,
+  AdminUserRecord,
   LawyerCoordinates,
   LawyerDashboard,
   LawyerDashboardRepository,
+  LawyerMediaRepository,
   LawyerRecord,
   LawyerRepository,
   LegalSpecialty,
@@ -18,7 +21,8 @@ import type {
   PublicLawyerProfile,
   PublicLawyerProfileRepository,
   PrayerRequestRepository,
-  Repositories
+  Repositories,
+  StoredLawyerImage
 } from "./types.js";
 
 function assertSupabaseOk(error: { message: string } | null, context: string) {
@@ -33,7 +37,7 @@ class SupabaseProfileRepository implements ProfileRepository {
   async getById(id: string): Promise<Profile | null> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, role, name, email, phone, avatar_url, cover_url")
+      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
       .eq("id", id)
       .maybeSingle();
     assertSupabaseOk(error, "profiles.getById");
@@ -46,6 +50,9 @@ class SupabaseProfileRepository implements ProfileRepository {
       phone: string | null;
       avatar_url: string | null;
       cover_url: string | null;
+      blocked_at: string | null;
+      created_at: string;
+      updated_at: string;
     };
     return {
       id: row.id,
@@ -54,8 +61,60 @@ class SupabaseProfileRepository implements ProfileRepository {
       email: row.email,
       phone: row.phone,
       avatarUrl: row.avatar_url,
-      coverUrl: row.cover_url
+      coverUrl: row.cover_url,
+      blockedAt: row.blocked_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     };
+  }
+
+  async listAdminUsers(): Promise<AdminUserRecord[]> {
+    const { data: profilesData, error: profilesError } = await this.supabase
+      .from("profiles")
+      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    assertSupabaseOk(profilesError, "profiles.listAdminUsers");
+
+    const { data: lawyersData, error: lawyersError } = await this.supabase
+      .from("lawyer_profiles")
+      .select("id, profile_id, status");
+    assertSupabaseOk(lawyersError, "lawyer_profiles.listForUsers");
+
+    const lawyerByProfileId = new Map(
+      ((lawyersData ?? []) as Array<{ id: string; profile_id: string; status: LawyerRecord["status"] }>).map((lawyer) => [
+        lawyer.profile_id,
+        lawyer
+      ])
+    );
+
+    return ((profilesData ?? []) as Array<{
+      id: string;
+      role: Profile["role"];
+      name: string;
+      email: string;
+      phone: string | null;
+      avatar_url: string | null;
+      cover_url: string | null;
+      blocked_at: string | null;
+      created_at: string;
+      updated_at: string;
+    }>).map((profile) => {
+      const lawyer = lawyerByProfileId.get(profile.id);
+      return {
+        id: profile.id,
+        role: profile.role,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        avatarUrl: profile.avatar_url,
+        coverUrl: profile.cover_url,
+        blockedAt: profile.blocked_at,
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at,
+        lawyerProfileId: lawyer?.id ?? null,
+        lawyerStatus: lawyer?.status ?? null
+      };
+    });
   }
 
   async createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile> {
@@ -66,9 +125,10 @@ class SupabaseProfileRepository implements ProfileRepository {
         role: "client",
         name: input.name,
         email: input.email,
-        phone: null
+        phone: null,
+        blocked_at: null
       })
-      .select("id, role, name, email, phone, avatar_url, cover_url")
+      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
       .single();
     assertSupabaseOk(error, "profiles.createClientProfile");
     const row = data as {
@@ -79,6 +139,9 @@ class SupabaseProfileRepository implements ProfileRepository {
       phone: string | null;
       avatar_url: string | null;
       cover_url: string | null;
+      blocked_at: string | null;
+      created_at: string;
+      updated_at: string;
     };
     return {
       id: row.id,
@@ -87,7 +150,10 @@ class SupabaseProfileRepository implements ProfileRepository {
       email: row.email,
       phone: row.phone,
       avatarUrl: row.avatar_url,
-      coverUrl: row.cover_url
+      coverUrl: row.cover_url,
+      blockedAt: row.blocked_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     };
   }
 
@@ -100,9 +166,10 @@ class SupabaseProfileRepository implements ProfileRepository {
         email: input.email,
         phone: input.whatsapp,
         avatar_url: input.avatarUrl ?? null,
-        cover_url: input.coverUrl ?? null
+        cover_url: input.coverUrl ?? null,
+        blocked_at: null
       })
-      .select("id, role, name, email, phone, avatar_url, cover_url")
+      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
       .single();
     assertSupabaseOk(error, "profiles.createLawyerProfile");
     const row = data as {
@@ -113,6 +180,9 @@ class SupabaseProfileRepository implements ProfileRepository {
       phone: string | null;
       avatar_url: string | null;
       cover_url: string | null;
+      blocked_at: string | null;
+      created_at: string;
+      updated_at: string;
     };
     return {
       id: row.id,
@@ -121,7 +191,10 @@ class SupabaseProfileRepository implements ProfileRepository {
       email: row.email,
       phone: row.phone,
       avatarUrl: row.avatar_url,
-      coverUrl: row.cover_url
+      coverUrl: row.cover_url,
+      blockedAt: row.blocked_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     };
   }
 
@@ -136,6 +209,17 @@ class SupabaseProfileRepository implements ProfileRepository {
       .update(payload)
       .eq("id", profileId);
     assertSupabaseOk(error, "profiles.updateVisualFields");
+  }
+
+  async updateBlocked(profileId: string, blocked: boolean): Promise<AdminUserRecord | null> {
+    const { error } = await this.supabase
+      .from("profiles")
+      .update({ blocked_at: blocked ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
+      .eq("id", profileId);
+    assertSupabaseOk(error, "profiles.updateBlocked");
+
+    const users = await this.listAdminUsers();
+    return users.find((user) => user.id === profileId) ?? null;
   }
 }
 
@@ -632,6 +716,85 @@ class SupabasePrayerRequestRepository implements PrayerRequestRepository {
       createdAt: row.created_at
     };
   }
+
+  async listAdmin(): Promise<AdminPrayerRequestRecord[]> {
+    const { data, error } = await this.supabase
+      .from("prayer_requests")
+      .select("id, client_profile_id, message, anonymous, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    assertSupabaseOk(error, "prayer_requests.listAdmin");
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      client_profile_id: string | null;
+      message: string;
+      anonymous: boolean;
+      status: "received";
+      created_at: string;
+    }>;
+    const clientIds = [...new Set(rows.map((row) => row.client_profile_id).filter((id): id is string => Boolean(id)))];
+    const clientById = new Map<string, { id: string; name: string; email: string }>();
+
+    if (clientIds.length > 0) {
+      const { data: clientsData, error: clientsError } = await this.supabase
+        .from("profiles")
+        .select("id, name, email")
+        .in("id", clientIds);
+      assertSupabaseOk(clientsError, "profiles.listPrayerClients");
+      for (const client of (clientsData ?? []) as Array<{ id: string; name: string; email: string }>) {
+        clientById.set(client.id, client);
+      }
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      message: row.message,
+      anonymous: row.anonymous,
+      status: row.status,
+      createdAt: row.created_at,
+      client: row.anonymous || !row.client_profile_id ? null : clientById.get(row.client_profile_id) ?? null
+    }));
+  }
+}
+
+class SupabaseLawyerMediaRepository implements LawyerMediaRepository {
+  private readonly bucket = "lawyer-media";
+
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  async uploadImage(input: Parameters<LawyerMediaRepository["uploadImage"]>[0]): Promise<StoredLawyerImage> {
+    const extensionByMime = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp"
+    } as const;
+    const buffer = Buffer.from(input.base64Data, "base64");
+    const path = `lawyers/${input.kind}/${crypto.randomUUID()}.${extensionByMime[input.mimeType]}`;
+
+    const bucket = await this.supabase.storage.getBucket(this.bucket);
+    if (bucket.error) {
+      const created = await this.supabase.storage.createBucket(this.bucket, {
+        public: true,
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+        fileSizeLimit: 2_000_000
+      });
+      assertSupabaseOk(created.error, "storage.createLawyerMediaBucket");
+    }
+
+    const { error } = await this.supabase.storage.from(this.bucket).upload(path, buffer, {
+      contentType: input.mimeType,
+      upsert: false
+    });
+    assertSupabaseOk(error, "storage.uploadLawyerImage");
+
+    const { data } = this.supabase.storage.from(this.bucket).getPublicUrl(path);
+    return {
+      url: data.publicUrl,
+      path,
+      contentType: input.mimeType
+    };
+  }
 }
 
 export function createSupabaseRepositories(supabase: SupabaseClient): Repositories {
@@ -643,6 +806,7 @@ export function createSupabaseRepositories(supabase: SupabaseClient): Repositori
     publicLawyerProfiles: new SupabasePublicLawyerProfileRepository(supabase),
     lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase),
     prayerRequests: new SupabasePrayerRequestRepository(supabase),
+    lawyerMedia: new SupabaseLawyerMediaRepository(supabase),
     auditLogs: new SupabaseAuditLogRepository(supabase),
     matches: new SupabaseMatchRepository(supabase),
     matchEvents: new SupabaseMatchEventRepository(supabase),

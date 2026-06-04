@@ -1,4 +1,4 @@
-import type { LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
+import type { AdminLawyerImageUpload, LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
 import type { Role } from "../auth/types.js";
 
 export type Profile = {
@@ -9,6 +9,24 @@ export type Profile = {
   phone?: string | null;
   avatarUrl?: string | null;
   coverUrl?: string | null;
+  blockedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type AdminUserRecord = {
+  id: string;
+  role: Role;
+  name: string;
+  email: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  blockedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lawyerProfileId?: string | null;
+  lawyerStatus?: LawyerRecord["status"] | null;
 };
 
 export type LawyerVisualFields = {
@@ -41,9 +59,11 @@ export type LawyerCoordinates = { lat: number; lng: number };
 
 export interface ProfileRepository {
   getById(id: string): Promise<Profile | null>;
+  listAdminUsers(): Promise<AdminUserRecord[]>;
   createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile>;
   createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile>;
   updateVisualFields(profileId: string, input: Pick<LawyerVisualFields, "avatarUrl" | "coverUrl">): Promise<void>;
+  updateBlocked(profileId: string, blocked: boolean): Promise<AdminUserRecord | null>;
 }
 
 export interface LegalSpecialtyRepository {
@@ -116,8 +136,29 @@ export type PrayerRequestRecord = {
   createdAt: string;
 };
 
+export type AdminPrayerRequestRecord = PrayerRequestRecord & {
+  message: string;
+  anonymous: boolean;
+  client?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+};
+
 export interface PrayerRequestRepository {
   create(input: PrayerRequest & { clientProfileId: string }): Promise<PrayerRequestRecord>;
+  listAdmin(): Promise<AdminPrayerRequestRecord[]>;
+}
+
+export type StoredLawyerImage = {
+  url: string;
+  path: string;
+  contentType: AdminLawyerImageUpload["mimeType"];
+};
+
+export interface LawyerMediaRepository {
+  uploadImage(input: AdminLawyerImageUpload): Promise<StoredLawyerImage>;
 }
 
 export interface AuditLogRepository {
@@ -178,6 +219,7 @@ export type Repositories = {
   publicLawyerProfiles: PublicLawyerProfileRepository;
   lawyerDashboards: LawyerDashboardRepository;
   prayerRequests: PrayerRequestRepository;
+  lawyerMedia: LawyerMediaRepository;
   auditLogs: AuditLogRepository;
   matches: MatchRepository;
   matchEvents: MatchEventRepository;

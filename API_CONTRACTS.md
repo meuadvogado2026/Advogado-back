@@ -37,6 +37,10 @@
 - `PATCH /v1/admin/lawyers/:id` - exige Bearer token com role `admin`
 - `PATCH /v1/admin/lawyers/:id/status`
 - `POST /v1/admin/geocode/cep`
+- `POST /v1/admin/lawyer-media` - upload server-side de foto/capa do advogado
+- `GET /v1/admin/prayer-requests` - leitura operacional dos pedidos de oracao
+- `GET /v1/admin/users` - listagem segura de usuarios cadastrados
+- `PATCH /v1/admin/users/:id` - bloqueio/desbloqueio de usuario
 - `GET /v1/admin/urgent-calls`
 - `PATCH /v1/admin/urgent-calls/:id`
 - `CRUD /v1/admin/benefits`
@@ -73,6 +77,29 @@ Em modo Supabase, o repositorio hidrata `name`, `email`, imagens seguras e areas
 partir de `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste area
 principal/secundarias em `lawyer_specialties`. A regra de aprovacao continua bloqueando
 `approved` sem coordenada valida.
+
+## Admin operacional - midia, oracoes e usuarios
+
+`POST /v1/admin/lawyer-media` requer role `admin` e recebe:
+
+```json
+{ "kind": "avatar", "fileName": "perfil.png", "mimeType": "image/png", "base64Data": "..." }
+```
+
+Aceita apenas `image/jpeg`, `image/png` e `image/webp`; rejeita arquivos acima de
+2MB e armazena por repository backend, sem acesso direto do admin ao Supabase.
+
+`GET /v1/admin/prayer-requests` retorna os ultimos pedidos para operacao admin:
+
+```json
+{ "requests": [{ "id": "...", "message": "...", "anonymous": true, "status": "received", "createdAt": "..." }] }
+```
+
+`GET /v1/admin/users` retorna usuarios cadastrados com identidade operacional,
+role, telefone opcional, status de bloqueio e vinculo de advogado quando existir.
+`PATCH /v1/admin/users/:id` recebe `{ "blocked": true }` ou `{ "blocked": false }`.
+Usuario bloqueado nao passa na autenticacao real (`GET /v1/me` e rotas autenticadas
+respondem `403`). A propria sessao admin nao pode se bloquear.
 
 ## POST /v1/auth/signup-client
 

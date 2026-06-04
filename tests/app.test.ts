@@ -498,6 +498,41 @@ describe("foundation API", () => {
     expect(typeof body.lawyer.officeLng).toBe("number");
   });
 
+  it("persists admin lawyer status changes in the subsequent list", async () => {
+    const app = await buildApp();
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyers",
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Status Persistente",
+        email: `status-persistente-${Date.now()}@example.test`,
+        whatsapp: "11955554444",
+        oabNumber: "778899",
+        oabState: "SP",
+        mainAreaId: "civil",
+        secondaryAreaIds: [],
+        officeCep: "01001-000",
+        officeNumber: "200",
+        status: "draft"
+      }
+    });
+    const createdId = create.json().lawyer.id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/lawyers/${createdId}`,
+      headers: ADMIN,
+      payload: { status: "suspended" }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/lawyers", headers: ADMIN });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json().lawyer.status).toBe("suspended");
+    expect(list.json().lawyers.find((item: { id: string }) => item.id === createdId).status).toBe("suspended");
+  });
+
   it("requires auth on admin geocode", async () => {
     const app = await buildApp();
     const response = await app.inject({
@@ -660,5 +695,80 @@ describe("foundation API", () => {
     expect(body.request.createdAt).toBeTruthy();
     expect(JSON.stringify(body)).not.toContain("Pedido reservado");
     expect(JSON.stringify(body)).not.toContain("clientProfileId");
+  });
+
+  it("lets admin list prayer requests with message content", async () => {
+    const app = await buildApp();
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "Pedido administrativo com tamanho suficiente para leitura.", anonymous: false }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/prayer-requests", headers: ADMIN });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(list.statusCode).toBe(200);
+    expect(list.json().requests[0]).toMatchObject({
+      message: "Pedido administrativo com tamanho suficiente para leitura.",
+      anonymous: false,
+      status: "received",
+      client: { email: "client@example.test" }
+    });
+  });
+
+  it("lets admin list and block registered users", async () => {
+    const app = await buildApp();
+    const list = await app.inject({ method: "GET", url: "/v1/admin/users", headers: ADMIN });
+    const client = list.json().users.find((user: { id: string }) => user.id === "test-client-user");
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/users/${client.id}`,
+      headers: ADMIN,
+      payload: { blocked: true }
+    });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(client.email).toBe("client@example.test");
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json().user.blockedAt).toBeTruthy();
+  });
+
+  it("prevents admin from blocking the current admin session", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/admin/users/test-admin-user",
+      headers: ADMIN,
+      payload: { blocked: true }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("uploads lawyer media through the backend boundary", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyer-media",
+      headers: ADMIN,
+      payload: {
+        kind: "avatar",
+        fileName: "perfil.png",
+        mimeType: "image/png",
+        base64Data: Buffer.from("fake image bytes").toString("base64")
+      }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().image).toMatchObject({
+      contentType: "image/png"
+    });
+    expect(response.json().image.url).toContain("https://storage.example.test/lawyers/avatar/");
   });
 });

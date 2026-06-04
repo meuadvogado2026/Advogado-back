@@ -46,6 +46,9 @@ export function createAuthPreHandler(env: AppEnv, repositories: Repositories, al
       if (!profile) {
         return reply.code(403).send(apiError("FORBIDDEN", "Perfil sem role autorizada."));
       }
+      if (profile.blockedAt) {
+        return reply.code(403).send(apiError("FORBIDDEN", "Usuario bloqueado."));
+      }
 
       request.currentUser = {
         id: profile.id,

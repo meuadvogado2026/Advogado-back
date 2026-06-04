@@ -4,6 +4,7 @@ import type {
   AuditLogRepository,
   LawyerCoordinates,
   LawyerDashboardRepository,
+  LawyerMediaRepository,
   LawyerRecord,
   LawyerRepository,
   LegalSpecialtyRepository,
@@ -13,24 +14,41 @@ import type {
   Profile,
   ProfileRepository,
   PublicLawyerProfileRepository,
+  StoredLawyerImage,
   PrayerRequestRepository,
   Repositories
 } from "./types.js";
 
 const profiles = new Map<string, Profile>();
 const lawyers = new Map<string, LawyerRecord>();
+const prayerRequests: Array<{
+  id: string;
+  clientProfileId: string | null;
+  message: string;
+  anonymous: boolean;
+  status: "received";
+  createdAt: string;
+}> = [];
+
+const seedCreatedAt = "2026-06-03T00:00:00.000Z";
 
 profiles.set("test-admin-user", {
   id: "test-admin-user",
   role: "admin",
   name: "Admin Teste",
-  email: "admin@example.test"
+  email: "admin@example.test",
+  blockedAt: null,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
 });
 profiles.set("test-client-user", {
   id: "test-client-user",
   role: "client",
   name: "Cliente Teste",
-  email: "client@example.test"
+  email: "client@example.test",
+  blockedAt: null,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
 });
 profiles.set("test-lawyer-user", {
   id: "test-lawyer-user",
@@ -38,26 +56,58 @@ profiles.set("test-lawyer-user", {
   name: "Dra. Teste",
   email: "lawyer@example.test",
   avatarUrl: "https://example.test/lawyer-avatar.jpg",
-  coverUrl: null
+  coverUrl: null,
+  blockedAt: null,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
 });
+
+function toAdminUser(profile: Profile) {
+  const lawyer = Array.from(lawyers.values()).find((candidate) => candidate.profileId === profile.id);
+  return {
+    id: profile.id,
+    role: profile.role,
+    name: profile.name,
+    email: profile.email,
+    phone: profile.phone ?? null,
+    avatarUrl: profile.avatarUrl ?? null,
+    coverUrl: profile.coverUrl ?? null,
+    blockedAt: profile.blockedAt ?? null,
+    createdAt: profile.createdAt ?? seedCreatedAt,
+    updatedAt: profile.updatedAt ?? seedCreatedAt,
+    lawyerProfileId: lawyer?.id ?? null,
+    lawyerStatus: lawyer?.status ?? null
+  };
+}
 
 class MemoryProfileRepository implements ProfileRepository {
   async getById(id: string) {
     return profiles.get(id) ?? null;
   }
 
+  async listAdminUsers() {
+    return Array.from(profiles.values())
+      .map(toAdminUser)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   async createClientProfile(input: { id: string; name: string; email: string }) {
+    const now = new Date().toISOString();
     const profile: Profile = {
       id: input.id,
       role: "client",
       name: input.name,
-      email: input.email
+      email: input.email,
+      blockedAt: null,
+      createdAt: now,
+      updatedAt: now
     };
     profiles.set(profile.id, profile);
     return profile;
   }
 
   async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">) {
+    const now = new Date().toISOString();
     const profile: Profile = {
       id: crypto.randomUUID(),
       role: "lawyer",
@@ -65,7 +115,10 @@ class MemoryProfileRepository implements ProfileRepository {
       email: input.email,
       phone: input.whatsapp,
       avatarUrl: input.avatarUrl ?? null,
-      coverUrl: input.coverUrl ?? null
+      coverUrl: input.coverUrl ?? null,
+      blockedAt: null,
+      createdAt: now,
+      updatedAt: now
     };
     profiles.set(profile.id, profile);
     return profile;
@@ -77,8 +130,21 @@ class MemoryProfileRepository implements ProfileRepository {
     profiles.set(profileId, {
       ...existing,
       ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl ?? null } : {}),
-      ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl ?? null } : {})
+      ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl ?? null } : {}),
+      updatedAt: new Date().toISOString()
     });
+  }
+
+  async updateBlocked(profileId: string, blocked: boolean) {
+    const existing = profiles.get(profileId);
+    if (!existing) return null;
+    const updated = {
+      ...existing,
+      blockedAt: blocked ? existing.blockedAt ?? new Date().toISOString() : null,
+      updatedAt: new Date().toISOString()
+    };
+    profiles.set(profileId, updated);
+    return toAdminUser(updated);
   }
 }
 
@@ -324,11 +390,54 @@ class MemoryLawyerDashboardRepository implements LawyerDashboardRepository {
 
 class MemoryPrayerRequestRepository implements PrayerRequestRepository {
   async create(input: Parameters<PrayerRequestRepository["create"]>[0]) {
-    void input.message;
-    return {
+    const request = {
       id: crypto.randomUUID(),
+      clientProfileId: input.anonymous ? null : input.clientProfileId,
+      message: input.message,
+      anonymous: input.anonymous,
       status: "received" as const,
       createdAt: new Date().toISOString()
+    };
+    prayerRequests.push(request);
+    return {
+      id: request.id,
+      status: request.status,
+      createdAt: request.createdAt
+    };
+  }
+
+  async listAdmin() {
+    return [...prayerRequests]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((request) => {
+        const client = request.clientProfileId ? profiles.get(request.clientProfileId) : null;
+        return {
+          id: request.id,
+          message: request.message,
+          anonymous: request.anonymous,
+          status: request.status,
+          createdAt: request.createdAt,
+          client:
+            client && !request.anonymous
+              ? { id: client.id, name: client.name, email: client.email }
+              : null
+        };
+      });
+  }
+}
+
+class MemoryLawyerMediaRepository implements LawyerMediaRepository {
+  async uploadImage(input: Parameters<LawyerMediaRepository["uploadImage"]>[0]): Promise<StoredLawyerImage> {
+    const extensionByMime = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp"
+    } as const;
+    const path = `lawyers/${input.kind}/${crypto.randomUUID()}.${extensionByMime[input.mimeType]}`;
+    return {
+      path,
+      contentType: input.mimeType,
+      url: `https://storage.example.test/${path}`
     };
   }
 }
@@ -342,6 +451,7 @@ export function createMemoryRepositories(): Repositories {
     publicLawyerProfiles: new MemoryPublicLawyerProfileRepository(),
     lawyerDashboards: new MemoryLawyerDashboardRepository(),
     prayerRequests: new MemoryPrayerRequestRepository(),
+    lawyerMedia: new MemoryLawyerMediaRepository(),
     auditLogs: new MemoryAuditLogRepository(),
     matches: new MemoryMatchRepository(),
     matchEvents: new MemoryMatchEventRepository(),

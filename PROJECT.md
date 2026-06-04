@@ -1,6 +1,6 @@
 # Backend Project - Meu Advogado 2.0
 
-**Fase:** producao Railway / spec 007 LGPD retencao OK_COM_RESSALVAS
+**Fase:** backend local com admin operacional ampliado / aguardando migration 0004 para producao
 **Hospedagem alvo:** Railway  
 **Stack:** Node.js + Fastify + TypeScript + Zod
 
@@ -17,6 +17,9 @@ Construir a API que centraliza regra de negocio, autorizacao, match por localiza
 - Geocodificar CEP do advogado.
 - Executar match por localizacao do cliente.
 - Registrar eventos, urgencias e audit logs.
+- Armazenar midia operacional do advogado via backend.
+- Expor pedidos de oracao para admin autenticado.
+- Bloquear/desbloquear usuarios cadastrados via admin.
 - Proteger PII e logs.
 
 ## Fora De Escopo
@@ -38,6 +41,7 @@ Construir a API que centraliza regra de negocio, autorizacao, match por localiza
 - `src/modules/areas`: `GET /v1/areas`.
 - `src/modules/match`: `POST /v1/match` real com auth, PostGIS e respostas `matched`/`empty`.
 - `src/modules/adminLawyers`: `GET/POST/PATCH /v1/admin/lawyers` com repositorios memory/Supabase.
+- `src/modules/adminOperations`: upload de midia, pedidos de oracao e gestao de usuarios.
 - `src/auth`: middleware Bearer token, Supabase Auth e guards por role.
 - `src/repositories`: fronteira de persistencia com implementacoes Supabase e memoria local/teste.
 - `src/modules/geocoding`: provider BrasilAPI + Nominatim cacheado e stub controlado para testes.
@@ -47,6 +51,7 @@ Construir a API que centraliza regra de negocio, autorizacao, match por localiza
 - `scripts/harness.ts` e `scripts/smoke.ts`: Harness CLI e smoke local.
 - `src/modules/lawyerProfiles`: `GET /v1/lawyers/:id` com auth cliente/admin, allowlist publica e `404` seguro para perfil indisponivel.
 - `src/modules/privacy`: retencao LGPD de `match_events` com expurgo por idade.
+- `src/db/migrations/0004_admin_users_blocking.sql`: coluna aditiva `profiles.blocked_at`.
 
 ## Scripts
 

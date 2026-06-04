@@ -55,6 +55,17 @@ export const prayerRequestSchema = z.object({
   anonymous: z.boolean().default(true)
 });
 
+export const adminUserPatchSchema = z.object({
+  blocked: z.boolean()
+});
+
+export const adminLawyerImageUploadSchema = z.object({
+  kind: z.enum(["avatar", "cover"]),
+  fileName: z.string().trim().min(1).max(180),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  base64Data: z.string().min(1).max(3_000_000)
+});
+
 export const clientSignupSchema = z.object({
   name: z.string().trim().min(3).max(120),
   email: z.string().trim().email(),
@@ -66,4 +77,6 @@ export type LawyerCreate = z.infer<typeof lawyerCreateSchema>;
 export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
 export type GeocodeCep = z.infer<typeof geocodeCepSchema>;
 export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
+export type AdminUserPatch = z.infer<typeof adminUserPatchSchema>;
+export type AdminLawyerImageUpload = z.infer<typeof adminLawyerImageUploadSchema>;
 export type ClientSignup = z.infer<typeof clientSignupSchema>;
