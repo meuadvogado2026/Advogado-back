@@ -160,7 +160,7 @@ describe("foundation API", () => {
     expect(response.json().error.code).toBe("UNAUTHORIZED");
   });
 
-  it("rejects lawyer role on client lawyer profile", async () => {
+  it("allows lawyer role to read a public lawyer profile with the same allowlist", async () => {
     const app = await buildApp();
     const response = await app.inject({
       method: "GET",
@@ -169,8 +169,14 @@ describe("foundation API", () => {
     });
     await app.close();
 
-    expect(response.statusCode).toBe(403);
-    expect(response.json().error.code).toBe("FORBIDDEN");
+    expect(response.statusCode).toBe(200);
+    expect(response.json().lawyer).toMatchObject({
+      id: "fixture-lawyer-sp",
+      verified: true,
+      whatsapp: "11988887777"
+    });
+    expect(response.json().lawyer.officeCep).toBeUndefined();
+    expect(response.json().lawyer.email).toBeUndefined();
   });
 
   it("returns safe 404 when client lawyer profile is unavailable", async () => {
@@ -740,7 +746,7 @@ describe("foundation API", () => {
     expect(response.json().error.code).toBe("UNAUTHORIZED");
   });
 
-  it("rejects lawyer role on prayer requests", async () => {
+  it("allows lawyer role on prayer requests without echoing the message", async () => {
     const app = await buildApp();
     const response = await app.inject({
       method: "POST",
@@ -750,8 +756,10 @@ describe("foundation API", () => {
     });
     await app.close();
 
-    expect(response.statusCode).toBe(403);
-    expect(response.json().error.code).toBe("FORBIDDEN");
+    expect(response.statusCode).toBe(201);
+    expect(response.json().request.status).toBe("received");
+    expect(JSON.stringify(response.json())).not.toContain("Pedido com tamanho");
+    expect(JSON.stringify(response.json())).not.toContain("clientProfileId");
   });
 
   it("validates prayer request message size", async () => {

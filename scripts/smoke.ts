@@ -37,7 +37,7 @@ const matchEmpty = await app.inject({
   payload: { lat: -23.55052, lng: -46.633308, accuracyM: 25, areaIds: ["criminal"] }
 });
 const lawyerProfileNoToken = await app.inject({ method: "GET", url: "/v1/lawyers/fixture-lawyer-sp" });
-const lawyerProfileForbidden = await app.inject({
+const lawyerProfileLawyer = await app.inject({
   method: "GET",
   url: "/v1/lawyers/fixture-lawyer-sp",
   headers: { authorization: "Bearer test-lawyer-token" }
@@ -77,7 +77,7 @@ if (
   !matchedVisualsOk ||
   !emptyOk ||
   lawyerProfileNoToken.statusCode !== 401 ||
-  lawyerProfileForbidden.statusCode !== 403 ||
+  lawyerProfileLawyer.statusCode !== 200 ||
   lawyerProfileUnavailable.statusCode !== 404 ||
   !lawyerProfileOk ||
   adminWithoutToken.statusCode !== 401
@@ -87,7 +87,7 @@ if (
       `signup=${clientSignup.statusCode}, matchNoToken=${matchNoToken.statusCode}, matched=${matchMatched.statusCode}/${matchMatched.json().status}, ` +
       `matchVisuals=${matchedVisualsOk}, ` +
       `empty=${matchEmpty.statusCode}/${matchEmpty.json().status}, ` +
-      `lawyerProfile=${lawyerProfileNoToken.statusCode}/${lawyerProfileForbidden.statusCode}/${lawyerProfileUnavailable.statusCode}/${lawyerProfileApproved.statusCode}, ` +
+      `lawyerProfile=${lawyerProfileNoToken.statusCode}/${lawyerProfileLawyer.statusCode}/${lawyerProfileUnavailable.statusCode}/${lawyerProfileApproved.statusCode}, ` +
       `admin401=${adminWithoutToken.statusCode}`
   );
 }
@@ -96,5 +96,5 @@ console.log(
   `Smoke backend OK: /health, /v1/areas, match sem token=401, ` +
     `signup cliente publico sem token/senha na resposta, ` +
     `matched (${matchMatched.json().distanceKm}km) com foto/capa e empty validados, ` +
-    `perfil advogado 401/403/404/200, admin sem token=401.`
+    `perfil advogado 401/200/404/200, admin sem token=401.`
 );

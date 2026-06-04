@@ -16,7 +16,7 @@ import { createSupabaseAdminClient } from "../src/lib/supabase.js";
  *  - POST /v1/admin/geocode/cep (admin real): 200
  *  - GET  /v1/admin/lawyers (admin real): 200 persistence=supabase
  *  - GET  /v1/lawyer/me/dashboard: 401 sem token, 403 cliente, 200 advogado
- *  - POST /v1/prayer-requests: 401 sem token, 403 advogado/admin, 422 invalido,
+ *  - POST /v1/prayer-requests: 401 sem token, 201 advogado, 403 admin, 422 invalido,
  *    201 cliente anonimo/identificado sem ecoar mensagem
  * Limpa os match_events criados (residuo LGPD). Tokens nunca impressos.
  *
@@ -187,7 +187,20 @@ const prayerLawyer = await call("/v1/prayer-requests", {
   headers: lawyerH,
   body: JSON.stringify({ message: NEUTRAL_PRAYER_TEXT, anonymous: true })
 });
-mark({ step: "POST /v1/prayer-requests advogado", status: prayerLawyer.status }, prayerLawyer.status === 403);
+const lawyerPrayerBody = JSON.stringify(prayerLawyer.body);
+const lawyerPrayerId = (prayerLawyer.body as { request?: { id?: string } })?.request?.id;
+if (lawyerPrayerId) prayerRequestIds.push(lawyerPrayerId);
+mark(
+  {
+    step: "POST /v1/prayer-requests advogado",
+    status: prayerLawyer.status,
+    echoedMessage: lawyerPrayerBody.includes(NEUTRAL_PRAYER_TEXT),
+    echoedClientProfileId: lawyerPrayerBody.includes("clientProfileId")
+  },
+  prayerLawyer.status === 201 &&
+    !lawyerPrayerBody.includes(NEUTRAL_PRAYER_TEXT) &&
+    !lawyerPrayerBody.includes("clientProfileId")
+);
 
 const prayerAdmin = await call("/v1/prayer-requests", {
   method: "POST",

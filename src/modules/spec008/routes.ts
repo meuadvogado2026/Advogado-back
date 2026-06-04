@@ -7,7 +7,7 @@ import type { Repositories } from "../../repositories/types.js";
 
 export async function registerSpec008Routes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireLawyer = createAuthPreHandler(env, repositories, ["lawyer"]);
-  const requireClient = createAuthPreHandler(env, repositories, ["client"]);
+  const requirePrayerRequester = createAuthPreHandler(env, repositories, ["client", "lawyer"]);
 
   app.get("/lawyer/me/dashboard", { preHandler: requireLawyer }, async (request, reply) => {
     const dashboard = await repositories.lawyerDashboards.getByProfileId(request.currentUser!.id);
@@ -21,7 +21,7 @@ export async function registerSpec008Routes(app: FastifyInstance, env: AppEnv, r
   app.post(
     "/prayer-requests",
     {
-      preHandler: requireClient,
+      preHandler: requirePrayerRequester,
       config: {
         rateLimit: {
           max: 5,

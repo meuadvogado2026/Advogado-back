@@ -5,9 +5,9 @@ import { apiError } from "../../lib/httpError.js";
 import type { Repositories } from "../../repositories/types.js";
 
 export async function registerLawyerProfileRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
-  const requireClient = createAuthPreHandler(env, repositories, ["client", "admin"]);
+  const requireProfileViewer = createAuthPreHandler(env, repositories, ["client", "admin", "lawyer"]);
 
-  app.get("/lawyers/:id", { preHandler: requireClient }, async (request, reply) => {
+  app.get("/lawyers/:id", { preHandler: requireProfileViewer }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const lawyer = await repositories.publicLawyerProfiles.getApprovedById(id);
     if (!lawyer) {

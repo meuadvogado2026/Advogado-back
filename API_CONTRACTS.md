@@ -17,9 +17,9 @@
 
 - `GET /v1/areas`
 - `POST /v1/match` - exige Bearer token (`client` ou `admin`); ver contrato abaixo
-- `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client` ou `admin`)
+- `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client`, `lawyer` ou `admin`)
 - `GET /v1/partner-logos` - lista publica segura de logos ativas para rodape da Home mobile
-- `POST /v1/prayer-requests` - implementado na spec 008 Parte 3; exige Bearer token `client`
+- `POST /v1/prayer-requests` - implementado na spec 008 Parte 3 e ampliado na spec 010; exige Bearer token `client` ou `lawyer`
 - `POST /v1/lawyers/:id/events`
 - `POST /v1/lawyers/:id/urgent-calls`
 
@@ -191,7 +191,7 @@ Regras:
 
 ## GET /v1/lawyers/:id (spec 004, ampliado na spec 008 Parte 2)
 
-Requer `Authorization: Bearer <token>` (`client` ou `admin`). Retorna somente advogado
+Requer `Authorization: Bearer <token>` (`client`, `lawyer` ou `admin`). Retorna somente advogado
 aprovado para cliente e responde `404` seguro quando o perfil nao existe ou nao esta
 disponivel.
 
@@ -284,7 +284,7 @@ parceiro externo, cupom real, chat ou agenda.
 
 ## POST /v1/prayer-requests (spec 008 Parte 3)
 
-Requer `Authorization: Bearer <token>` com role `client`. Advogado/admin recebem `403`.
+Requer `Authorization: Bearer <token>` com role `client` ou `lawyer`. Admin recebe `403`.
 Endpoint possui rate limit proporcional.
 
 Request:
@@ -300,7 +300,7 @@ Resposta `201`:
 ```
 
 Regras: `anonymous=true` persiste `client_profile_id = null`; `anonymous=false` persiste
-somente o profile id autenticado. A resposta nao ecoa o texto. Logs, harness e docs nao
+somente o profile id autenticado, seja cliente ou advogado no ciclo atual. A resposta nao ecoa o texto. Logs, harness e docs nao
 devem registrar texto do pedido, token, telefone completo, coordenada ou payload sensivel.
 Retencao operacional MVP: expurgo integral de `prayer_requests` antigos apos 90 dias via
 `npm run retention:prayer-requests`, com dry-run padrao e apply bloqueado por confirmacao
