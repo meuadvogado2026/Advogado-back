@@ -453,6 +453,8 @@ describe("foundation API", () => {
     expect(response.statusCode).toBe(201);
     const body = response.json();
     // Coordenada geocodificada deve ser persistida no registro do advogado.
+    expect(body.lawyer.officeCity).toBeTruthy();
+    expect(body.lawyer.officeState).toBeTruthy();
     expect(typeof body.lawyer.officeLat).toBe("number");
     expect(typeof body.lawyer.officeLng).toBe("number");
     expect(typeof body.coordinates.lat).toBe("number");
@@ -494,8 +496,62 @@ describe("foundation API", () => {
     expect(response.statusCode).toBe(200);
     const body = response.json();
     expect(body.lawyer.status).toBe("approved");
+    expect(body.lawyer.officeCity).toBeTruthy();
+    expect(body.lawyer.officeState).toBeTruthy();
     expect(typeof body.lawyer.officeLat).toBe("number");
     expect(typeof body.lawyer.officeLng).toBe("number");
+  });
+
+  it("lets admin edit lawyer operational data and persist location from CEP", async () => {
+    const app = await buildApp();
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyers",
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Editavel",
+        email: `editavel-${Date.now()}@example.test`,
+        whatsapp: "11955554444",
+        oabNumber: "778899",
+        oabState: "SP",
+        mainAreaId: "civil",
+        secondaryAreaIds: [],
+        officeCep: "01001-000",
+        officeNumber: "200",
+        status: "draft"
+      }
+    });
+    const createdId = create.json().lawyer.id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/lawyers/${createdId}`,
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Editavel Atualizada",
+        email: create.json().lawyer.email,
+        whatsapp: "11944443333",
+        oabNumber: "778899",
+        oabState: "SP",
+        mainAreaId: "trabalhista",
+        secondaryAreaIds: [],
+        officeCep: "01001-000",
+        officeNumber: "300",
+        miniBio: "Perfil editado pelo admin.",
+        status: "pending_review"
+      }
+    });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json().lawyer).toMatchObject({
+      whatsapp: "11944443333",
+      officeNumber: "300",
+      officeCity: expect.any(String),
+      officeState: expect.any(String),
+      mainAreaId: "trabalhista",
+      miniBio: "Perfil editado pelo admin.",
+    });
   });
 
   it("persists admin lawyer status changes in the subsequent list", async () => {
@@ -718,6 +774,29 @@ describe("foundation API", () => {
     });
   });
 
+  it("lets admin mark a prayer request as read", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "Pedido para leitura administrativa com tamanho suficiente.", anonymous: true }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/prayer-requests", headers: ADMIN });
+    const requestId = list.json().requests[0].id;
+    const patch = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/prayer-requests/${requestId}`,
+      headers: ADMIN,
+      payload: { status: "read" }
+    });
+    await app.close();
+
+    expect(patch.statusCode).toBe(200);
+    expect(patch.json().request.status).toBe("read");
+    expect(patch.json().request.readAt).toBeTruthy();
+  });
+
   it("lets admin list and block registered users", async () => {
     const app = await buildApp();
     const list = await app.inject({ method: "GET", url: "/v1/admin/users", headers: ADMIN });
@@ -770,5 +849,41 @@ describe("foundation API", () => {
       contentType: "image/png"
     });
     expect(response.json().image.url).toContain("https://storage.example.test/lawyers/avatar/");
+  });
+
+  it("lets admin upload and create partner logos for future public rendering", async () => {
+    const app = await buildApp();
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/admin/partner-logo-media",
+      headers: ADMIN,
+      payload: {
+        kind: "partnerLogo",
+        fileName: "parceiro.png",
+        mimeType: "image/png",
+        base64Data: Buffer.from("fake partner logo").toString("base64")
+      }
+    });
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/admin/partner-logos",
+      headers: ADMIN,
+      payload: {
+        name: "Parceiro Teste",
+        logoUrl: upload.json().image.url,
+        websiteUrl: "https://partner.example.test",
+        active: true
+      }
+    });
+    const adminList = await app.inject({ method: "GET", url: "/v1/admin/partner-logos", headers: ADMIN });
+    const publicList = await app.inject({ method: "GET", url: "/v1/partner-logos" });
+    await app.close();
+
+    expect(upload.statusCode).toBe(201);
+    expect(upload.json().image.url).toContain("https://storage.example.test/partners/logos/");
+    expect(create.statusCode).toBe(201);
+    expect(create.json().partner).toMatchObject({ name: "Parceiro Teste", active: true });
+    expect(adminList.json().partners[0].logoUrl).toBe(upload.json().image.url);
+    expect(publicList.json().partners[0]).toMatchObject({ name: "Parceiro Teste", logoUrl: upload.json().image.url });
   });
 });

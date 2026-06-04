@@ -8,6 +8,7 @@ import type {
   LawyerDashboard,
   LawyerDashboardRepository,
   LawyerMediaRepository,
+  LawyerOfficeLocation,
   LawyerRecord,
   LawyerRepository,
   LegalSpecialty,
@@ -16,12 +17,15 @@ import type {
   MatchEventRepository,
   MatchRepository,
   NearestLawyerInput,
+  PartnerLogoRecord,
+  PartnerLogoRepository,
   Profile,
   ProfileRepository,
   PublicLawyerProfile,
   PublicLawyerProfileRepository,
   PrayerRequestRepository,
   Repositories,
+  StoredAdminImage,
   StoredLawyerImage
 } from "./types.js";
 
@@ -211,6 +215,25 @@ class SupabaseProfileRepository implements ProfileRepository {
     assertSupabaseOk(error, "profiles.updateVisualFields");
   }
 
+  async updateLawyerProfile(
+    profileId: string,
+    input: Partial<Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">>
+  ): Promise<void> {
+    const payload: Record<string, string | null> = {};
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.email !== undefined) payload.email = input.email;
+    if (input.whatsapp !== undefined) payload.phone = input.whatsapp;
+    if (input.avatarUrl !== undefined) payload.avatar_url = input.avatarUrl ?? null;
+    if (input.coverUrl !== undefined) payload.cover_url = input.coverUrl ?? null;
+    if (Object.keys(payload).length === 0) return;
+
+    const { error } = await this.supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", profileId);
+    assertSupabaseOk(error, "profiles.updateLawyerProfile");
+  }
+
   async updateBlocked(profileId: string, blocked: boolean): Promise<AdminUserRecord | null> {
     const { error } = await this.supabase
       .from("profiles")
@@ -384,7 +407,7 @@ class SupabaseLawyerRepository implements LawyerRepository {
     return lawyer ?? null;
   }
 
-  async create(input: LawyerCreate, coordinates?: LawyerCoordinates): Promise<LawyerRecord> {
+  async create(input: LawyerCreate, location?: LawyerOfficeLocation): Promise<LawyerRecord> {
     const profile = await this.profiles.createLawyerProfile(input);
     const insertPayload: Record<string, unknown> = {
       profile_id: profile.id,
@@ -397,10 +420,14 @@ class SupabaseLawyerRepository implements LawyerRepository {
       office_cep: input.officeCep.replace(/\D/g, ""),
       office_number: input.officeNumber
     };
-    if (coordinates) {
-      insertPayload.office_lat = coordinates.lat;
-      insertPayload.office_lng = coordinates.lng;
-      insertPayload.office_location = toOfficeLocation(coordinates);
+    if (location?.address) {
+      insertPayload.office_city = location.address.city;
+      insertPayload.office_state = location.address.state;
+    }
+    if (location?.coordinates) {
+      insertPayload.office_lat = location.coordinates.lat;
+      insertPayload.office_lng = location.coordinates.lng;
+      insertPayload.office_location = toOfficeLocation(location.coordinates);
     }
 
     const { data, error } = await this.supabase
@@ -436,7 +463,10 @@ class SupabaseLawyerRepository implements LawyerRepository {
     });
   }
 
-  async update(id: string, patch: LawyerPatch, coordinates?: LawyerCoordinates): Promise<LawyerRecord | null> {
+  async update(id: string, patch: LawyerPatch, location?: LawyerOfficeLocation): Promise<LawyerRecord | null> {
+    const existing = await this.getById(id);
+    if (!existing) return null;
+
     const updatePayload: Record<string, unknown> = {};
     if (patch.status) updatePayload.status = patch.status;
     if (patch.oabNumber) updatePayload.oab_number = patch.oabNumber;
@@ -446,10 +476,14 @@ class SupabaseLawyerRepository implements LawyerRepository {
     if (patch.fullBio !== undefined) updatePayload.full_bio = patch.fullBio;
     if (patch.officeCep) updatePayload.office_cep = patch.officeCep.replace(/\D/g, "");
     if (patch.officeNumber) updatePayload.office_number = patch.officeNumber;
-    if (coordinates) {
-      updatePayload.office_lat = coordinates.lat;
-      updatePayload.office_lng = coordinates.lng;
-      updatePayload.office_location = toOfficeLocation(coordinates);
+    if (location?.address) {
+      updatePayload.office_city = location.address.city;
+      updatePayload.office_state = location.address.state;
+    }
+    if (location?.coordinates) {
+      updatePayload.office_lat = location.coordinates.lat;
+      updatePayload.office_lng = location.coordinates.lng;
+      updatePayload.office_location = toOfficeLocation(location.coordinates);
     }
 
     const { data, error } = await this.supabase
@@ -483,12 +517,7 @@ class SupabaseLawyerRepository implements LawyerRepository {
         assertSupabaseOk(insertError, "lawyer_specialties.replace.insert");
       }
     }
-    if (patch.avatarUrl !== undefined || patch.coverUrl !== undefined) {
-      await this.profiles.updateVisualFields((data as LawyerRow).profile_id, {
-        avatarUrl: patch.avatarUrl,
-        coverUrl: patch.coverUrl
-      });
-    }
+    await this.profiles.updateLawyerProfile(existing.profileId, patch);
 
     const [lawyer] = await this.hydrateRows([data as LawyerRow]);
     return lawyer ?? null;
@@ -706,33 +735,27 @@ class SupabasePrayerRequestRepository implements PrayerRequestRepository {
         anonymous: input.anonymous,
         status: "received"
       })
-      .select("id, status, created_at")
+      .select("id, status, created_at, read_at")
       .single();
     assertSupabaseOk(error, "prayer_requests.create");
-    const row = data as { id: string; status: "received"; created_at: string };
+    const row = data as { id: string; status: "received"; created_at: string; read_at: string | null };
     return {
       id: row.id,
       status: row.status,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      readAt: row.read_at
     };
   }
 
-  async listAdmin(): Promise<AdminPrayerRequestRecord[]> {
-    const { data, error } = await this.supabase
-      .from("prayer_requests")
-      .select("id, client_profile_id, message, anonymous, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100);
-    assertSupabaseOk(error, "prayer_requests.listAdmin");
-
-    const rows = (data ?? []) as Array<{
-      id: string;
-      client_profile_id: string | null;
-      message: string;
-      anonymous: boolean;
-      status: "received";
-      created_at: string;
-    }>;
+  private async hydrateRows(rows: Array<{
+    id: string;
+    client_profile_id: string | null;
+    message: string;
+    anonymous: boolean;
+    status: "received" | "read";
+    created_at: string;
+    read_at: string | null;
+  }>) {
     const clientIds = [...new Set(rows.map((row) => row.client_profile_id).filter((id): id is string => Boolean(id)))];
     const clientById = new Map<string, { id: string; name: string; email: string }>();
 
@@ -753,8 +776,54 @@ class SupabasePrayerRequestRepository implements PrayerRequestRepository {
       anonymous: row.anonymous,
       status: row.status,
       createdAt: row.created_at,
+      readAt: row.read_at,
       client: row.anonymous || !row.client_profile_id ? null : clientById.get(row.client_profile_id) ?? null
     }));
+  }
+
+  async listAdmin(): Promise<AdminPrayerRequestRecord[]> {
+    const { data, error } = await this.supabase
+      .from("prayer_requests")
+      .select("id, client_profile_id, message, anonymous, status, created_at, read_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    assertSupabaseOk(error, "prayer_requests.listAdmin");
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      client_profile_id: string | null;
+      message: string;
+      anonymous: boolean;
+      status: "received" | "read";
+      created_at: string;
+      read_at: string | null;
+    }>;
+    return this.hydrateRows(rows);
+  }
+
+  async updateStatus(id: string, status: "received" | "read"): Promise<AdminPrayerRequestRecord | null> {
+    const { data, error } = await this.supabase
+      .from("prayer_requests")
+      .update({
+        status,
+        read_at: status === "read" ? new Date().toISOString() : null
+      })
+      .eq("id", id)
+      .select("id, client_profile_id, message, anonymous, status, created_at, read_at")
+      .maybeSingle();
+    assertSupabaseOk(error, "prayer_requests.updateStatus");
+    if (!data) return null;
+
+    const [request] = await this.hydrateRows([data as {
+      id: string;
+      client_profile_id: string | null;
+      message: string;
+      anonymous: boolean;
+      status: "received" | "read";
+      created_at: string;
+      read_at: string | null;
+    }]);
+    return request ?? null;
   }
 }
 
@@ -797,6 +866,99 @@ class SupabaseLawyerMediaRepository implements LawyerMediaRepository {
   }
 }
 
+class SupabasePartnerLogoRepository implements PartnerLogoRepository {
+  private readonly bucket = "partner-media";
+
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  private mapRow(row: {
+    id: string;
+    name: string;
+    logo_url: string;
+    website_url: string | null;
+    active: boolean;
+    created_at: string;
+    updated_at: string;
+  }): PartnerLogoRecord {
+    return {
+      id: row.id,
+      name: row.name,
+      logoUrl: row.logo_url,
+      websiteUrl: row.website_url,
+      active: row.active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  async listAdmin(): Promise<PartnerLogoRecord[]> {
+    const { data, error } = await this.supabase
+      .from("partner_logos")
+      .select("id, name, logo_url, website_url, active, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    assertSupabaseOk(error, "partner_logos.listAdmin");
+    return ((data ?? []) as Parameters<SupabasePartnerLogoRepository["mapRow"]>[0][]).map((row) => this.mapRow(row));
+  }
+
+  async listPublic(): Promise<PartnerLogoRecord[]> {
+    const { data, error } = await this.supabase
+      .from("partner_logos")
+      .select("id, name, logo_url, website_url, active, created_at, updated_at")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    assertSupabaseOk(error, "partner_logos.listPublic");
+    return ((data ?? []) as Parameters<SupabasePartnerLogoRepository["mapRow"]>[0][]).map((row) => this.mapRow(row));
+  }
+
+  async create(input: Parameters<PartnerLogoRepository["create"]>[0]): Promise<PartnerLogoRecord> {
+    const { data, error } = await this.supabase
+      .from("partner_logos")
+      .insert({
+        name: input.name,
+        logo_url: input.logoUrl,
+        website_url: input.websiteUrl ?? null,
+        active: input.active
+      })
+      .select("id, name, logo_url, website_url, active, created_at, updated_at")
+      .single();
+    assertSupabaseOk(error, "partner_logos.create");
+    return this.mapRow(data as Parameters<SupabasePartnerLogoRepository["mapRow"]>[0]);
+  }
+
+  async uploadLogo(input: Parameters<PartnerLogoRepository["uploadLogo"]>[0]): Promise<StoredAdminImage> {
+    const extensionByMime = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp"
+    } as const;
+    const buffer = Buffer.from(input.base64Data, "base64");
+    const path = `partners/logos/${crypto.randomUUID()}.${extensionByMime[input.mimeType]}`;
+
+    const bucket = await this.supabase.storage.getBucket(this.bucket);
+    if (bucket.error) {
+      const created = await this.supabase.storage.createBucket(this.bucket, {
+        public: true,
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+        fileSizeLimit: 2_000_000
+      });
+      assertSupabaseOk(created.error, "storage.createPartnerMediaBucket");
+    }
+
+    const { error } = await this.supabase.storage.from(this.bucket).upload(path, buffer, {
+      contentType: input.mimeType,
+      upsert: false
+    });
+    assertSupabaseOk(error, "storage.uploadPartnerLogo");
+
+    const { data } = this.supabase.storage.from(this.bucket).getPublicUrl(path);
+    return {
+      url: data.publicUrl,
+      path,
+      contentType: input.mimeType
+    };
+  }
+}
+
 export function createSupabaseRepositories(supabase: SupabaseClient): Repositories {
   const profiles = new SupabaseProfileRepository(supabase);
   return {
@@ -807,6 +969,7 @@ export function createSupabaseRepositories(supabase: SupabaseClient): Repositori
     lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase),
     prayerRequests: new SupabasePrayerRequestRepository(supabase),
     lawyerMedia: new SupabaseLawyerMediaRepository(supabase),
+    partnerLogos: new SupabasePartnerLogoRepository(supabase),
     auditLogs: new SupabaseAuditLogRepository(supabase),
     matches: new SupabaseMatchRepository(supabase),
     matchEvents: new SupabaseMatchEventRepository(supabase),

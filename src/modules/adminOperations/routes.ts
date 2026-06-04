@@ -1,7 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
-import { adminLawyerImageUploadSchema, adminUserPatchSchema } from "../../contracts/api.js";
+import {
+  adminImageUploadSchema,
+  adminLawyerImageUploadSchema,
+  adminPartnerLogoCreateSchema,
+  adminPrayerRequestPatchSchema,
+  adminUserPatchSchema
+} from "../../contracts/api.js";
 import { apiError } from "../../lib/httpError.js";
 import type { Repositories } from "../../repositories/types.js";
 
@@ -14,12 +20,40 @@ function decodedImageSize(base64Data: string) {
 export async function registerAdminOperationRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
 
+  app.get("/partner-logos", async () => ({
+    partners: await repositories.partnerLogos.listPublic(),
+    persistence: repositories.mode
+  }));
+
   app.get("/admin/prayer-requests", { preHandler: requireAdmin }, async () => ({
     requests: await repositories.prayerRequests.listAdmin(),
     page: 1,
     pageSize: 100,
     persistence: repositories.mode
   }));
+
+  app.patch("/admin/prayer-requests/:id", { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = adminPrayerRequestPatchSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Atualizacao de oracao invalida.", parsed.error.issues));
+    }
+
+    const prayerRequest = await repositories.prayerRequests.updateStatus(id, parsed.data.status);
+    if (!prayerRequest) {
+      return reply.code(404).send(apiError("NOT_FOUND", "Pedido de oracao nao encontrado."));
+    }
+
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: parsed.data.status === "read" ? "admin.prayer_requests.read" : "admin.prayer_requests.unread",
+      entityType: "prayer_request",
+      entityId: prayerRequest.id,
+      metadata: { persistence: repositories.mode }
+    });
+
+    return { request: prayerRequest };
+  });
 
   app.get("/admin/users", { preHandler: requireAdmin }, async () => ({
     users: await repositories.profiles.listAdminUsers(),
@@ -78,5 +112,54 @@ export async function registerAdminOperationRoutes(app: FastifyInstance, env: Ap
     });
 
     return reply.code(201).send({ image, persistence: repositories.mode });
+  });
+
+  app.get("/admin/partner-logos", { preHandler: requireAdmin }, async () => ({
+    partners: await repositories.partnerLogos.listAdmin(),
+    page: 1,
+    pageSize: 100,
+    persistence: repositories.mode
+  }));
+
+  app.post("/admin/partner-logo-media", { preHandler: requireAdmin }, async (request, reply) => {
+    const parsed = adminImageUploadSchema.safeParse(request.body);
+    if (!parsed.success || parsed.data.kind !== "partnerLogo") {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Logo invalida.", parsed.success ? [] : parsed.error.issues));
+    }
+
+    if (decodedImageSize(parsed.data.base64Data) > maxImageBytes) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Logo deve ter no maximo 2MB."));
+    }
+
+    const image = await repositories.partnerLogos.uploadLogo(parsed.data);
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: "admin.partner_logo_media.upload",
+      entityType: "partner_logo_media",
+      metadata: {
+        persistence: repositories.mode,
+        contentType: image.contentType
+      }
+    });
+
+    return reply.code(201).send({ image, persistence: repositories.mode });
+  });
+
+  app.post("/admin/partner-logos", { preHandler: requireAdmin }, async (request, reply) => {
+    const parsed = adminPartnerLogoCreateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Parceiro invalido.", parsed.error.issues));
+    }
+
+    const partner = await repositories.partnerLogos.create(parsed.data);
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: "admin.partner_logos.create",
+      entityType: "partner_logo",
+      entityId: partner.id,
+      metadata: { persistence: repositories.mode, active: partner.active }
+    });
+
+    return reply.code(201).send({ partner, persistence: repositories.mode });
   });
 }

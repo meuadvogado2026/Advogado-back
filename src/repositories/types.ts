@@ -1,4 +1,4 @@
-import type { AdminLawyerImageUpload, LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
+import type { AdminImageUpload, AdminLawyerImageUpload, AdminPartnerLogoCreate, LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
 import type { Role } from "../auth/types.js";
 
 export type Profile = {
@@ -57,11 +57,22 @@ export type LawyerRecord = LawyerCreate & {
 /** Coordenada geocodificada persistida no escritorio do advogado (office_location). */
 export type LawyerCoordinates = { lat: number; lng: number };
 
+export type LawyerOfficeAddress = {
+  city: string;
+  state: string;
+};
+
+export type LawyerOfficeLocation = {
+  address?: LawyerOfficeAddress;
+  coordinates?: LawyerCoordinates;
+};
+
 export interface ProfileRepository {
   getById(id: string): Promise<Profile | null>;
   listAdminUsers(): Promise<AdminUserRecord[]>;
   createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile>;
   createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile>;
+  updateLawyerProfile(profileId: string, input: Partial<Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">>): Promise<void>;
   updateVisualFields(profileId: string, input: Pick<LawyerVisualFields, "avatarUrl" | "coverUrl">): Promise<void>;
   updateBlocked(profileId: string, blocked: boolean): Promise<AdminUserRecord | null>;
 }
@@ -73,8 +84,8 @@ export interface LegalSpecialtyRepository {
 export interface LawyerRepository {
   list(): Promise<LawyerRecord[]>;
   getById(id: string): Promise<LawyerRecord | null>;
-  create(input: LawyerCreate, coordinates?: LawyerCoordinates): Promise<LawyerRecord>;
-  update(id: string, patch: LawyerPatch, coordinates?: LawyerCoordinates): Promise<LawyerRecord | null>;
+  create(input: LawyerCreate, location?: LawyerOfficeLocation): Promise<LawyerRecord>;
+  update(id: string, patch: LawyerPatch, location?: LawyerOfficeLocation): Promise<LawyerRecord | null>;
 }
 
 /** Allowlist publica do perfil profissional exposto ao cliente autenticado. */
@@ -132,8 +143,9 @@ export interface LawyerDashboardRepository {
 
 export type PrayerRequestRecord = {
   id: string;
-  status: "received";
+  status: "received" | "read";
   createdAt: string;
+  readAt?: string | null;
 };
 
 export type AdminPrayerRequestRecord = PrayerRequestRecord & {
@@ -149,6 +161,7 @@ export type AdminPrayerRequestRecord = PrayerRequestRecord & {
 export interface PrayerRequestRepository {
   create(input: PrayerRequest & { clientProfileId: string }): Promise<PrayerRequestRecord>;
   listAdmin(): Promise<AdminPrayerRequestRecord[]>;
+  updateStatus(id: string, status: PrayerRequestRecord["status"]): Promise<AdminPrayerRequestRecord | null>;
 }
 
 export type StoredLawyerImage = {
@@ -159,6 +172,29 @@ export type StoredLawyerImage = {
 
 export interface LawyerMediaRepository {
   uploadImage(input: AdminLawyerImageUpload): Promise<StoredLawyerImage>;
+}
+
+export type PartnerLogoRecord = {
+  id: string;
+  name: string;
+  logoUrl: string;
+  websiteUrl?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StoredAdminImage = {
+  url: string;
+  path: string;
+  contentType: AdminImageUpload["mimeType"];
+};
+
+export interface PartnerLogoRepository {
+  listAdmin(): Promise<PartnerLogoRecord[]>;
+  listPublic(): Promise<PartnerLogoRecord[]>;
+  create(input: AdminPartnerLogoCreate): Promise<PartnerLogoRecord>;
+  uploadLogo(input: AdminImageUpload): Promise<StoredAdminImage>;
 }
 
 export interface AuditLogRepository {
@@ -220,6 +256,7 @@ export type Repositories = {
   lawyerDashboards: LawyerDashboardRepository;
   prayerRequests: PrayerRequestRepository;
   lawyerMedia: LawyerMediaRepository;
+  partnerLogos: PartnerLogoRepository;
   auditLogs: AuditLogRepository;
   matches: MatchRepository;
   matchEvents: MatchEventRepository;

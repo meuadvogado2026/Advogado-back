@@ -59,11 +59,26 @@ export const adminUserPatchSchema = z.object({
   blocked: z.boolean()
 });
 
-export const adminLawyerImageUploadSchema = z.object({
-  kind: z.enum(["avatar", "cover"]),
+export const adminPrayerRequestPatchSchema = z.object({
+  status: z.enum(["received", "read"])
+});
+
+export const adminImageUploadSchema = z.object({
+  kind: z.enum(["avatar", "cover", "partnerLogo"]),
   fileName: z.string().trim().min(1).max(180),
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
   base64Data: z.string().min(1).max(3_000_000)
+});
+
+export const adminLawyerImageUploadSchema = adminImageUploadSchema.extend({
+  kind: z.enum(["avatar", "cover"])
+});
+
+export const adminPartnerLogoCreateSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  logoUrl: safeHttpsUrlSchema.refine((value): value is string => Boolean(value), "Logo HTTPS obrigatoria."),
+  websiteUrl: safeHttpsUrlSchema.optional(),
+  active: z.boolean().default(true)
 });
 
 export const clientSignupSchema = z.object({
@@ -78,5 +93,8 @@ export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
 export type GeocodeCep = z.infer<typeof geocodeCepSchema>;
 export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
 export type AdminUserPatch = z.infer<typeof adminUserPatchSchema>;
+export type AdminPrayerRequestPatch = z.infer<typeof adminPrayerRequestPatchSchema>;
+export type AdminImageUpload = z.infer<typeof adminImageUploadSchema>;
 export type AdminLawyerImageUpload = z.infer<typeof adminLawyerImageUploadSchema>;
+export type AdminPartnerLogoCreate = z.infer<typeof adminPartnerLogoCreateSchema>;
 export type ClientSignup = z.infer<typeof clientSignupSchema>;

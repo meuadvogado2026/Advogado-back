@@ -2,7 +2,7 @@
 
 **Ultima atualizacao:** 2026-06-04
 **Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO
-**Veredito:** ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Veredito:** PERFIL_ADVOGADO_SOCIAIS_LOCAL_OK / QUESTIONAR_MIGRATION_0006_SUPABASE / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -15,6 +15,7 @@
 - Bugfix publicado no commit `60d90ce`: `POST /v1/match` nao retorna 500 se a persistencia de `match_events` falhar; a rota registra log sem coordenada/token e preserva a resposta para o cliente. `prod:smoke` pos-push passou contra Railway.
 - Cadastro cliente publicado no commit `45ec1dc`: `POST /v1/auth/signup-client` retornou `422` para payload invalido, `201` para usuario descartavel real, criou Supabase Auth + `profiles.role=client`, login Supabase Auth retornou `200`, `GET /v1/me` retornou `role=client` e cleanup de Auth/profile foi concluido sem expor senha, token ou service role.
 - Admin operacional ampliado publicado no commit `a0067c4`: `POST /v1/admin/lawyer-media`, `GET /v1/admin/prayer-requests`, `GET /v1/admin/users` e `PATCH /v1/admin/users/:id` publicados no Railway. Smoke publico validou `/health` `200`, endpoints admin novos sem token `401` e CORS `204` para Vercel; smoke autenticado assistido validou status persistente de advogado, upload de imagem, oracoes, usuarios e bloqueio/desbloqueio de usuario descartavel seguro com limpeza.
+- Localmente, `GET /v1/lawyers/:id` ganhou links sociais opcionais seguros (`instagramUrl`, `linkedinUrl`, `facebookUrl`, `websiteUrl`); producao depende de aplicar `src/db/migrations/0006_lawyer_social_links.sql` no Supabase e publicar o backend.
 
 ## Concluido
 
@@ -53,6 +54,7 @@
 - [x] Revalidacao publica pos-env admin Vercel: `/v1/areas` `200`, `/v1/me` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, `POST /v1/admin/lawyers` sem token `401` e preflights `204`, todos com CORS para `https://advogado20admin.vercel.app`.
 - [x] Smoke autenticado do admin publicado validou backend Railway para `POST /v1/admin/geocode/cep` e `POST /v1/admin/lawyers`; cadastro descartavel foi limpo via service role local e verificacao final ficou sem residuo.
 - [x] Spec 008 Parte 2 implementada localmente: `GET /v1/lawyers/:id` ganhou campos opcionais `avatarUrl`, `coverUrl`, `miniBio`, `fullBio`, `yearsExperience`, `planLabel` e `emergencyAvailable` sem quebrar contrato; URLs visuais inseguras/invalidas viram `null`.
+- [x] Perfil publico do advogado ganhou suporte local a redes sociais opcionais HTTPS: Instagram, LinkedIn, Facebook e site profissional, preservando a allowlist sem CEP/email/coordenadas.
 - [x] Allowlist publica revalidada: perfil segue sem CEP, endereco completo, coordenada, email interno, status administrativo ou auditoria. Testes cobrem `401`, `403`, `404`, `200` e URL insegura normalizada.
 - [x] Spec 008 Parte 3 implementada localmente: `GET /v1/lawyer/me/dashboard` com role `lawyer`, beneficios estaticos/seguros e metricas zeradas; `POST /v1/prayer-requests` com role `client`, validacao Zod, rate limit, anonimato e resposta sem ecoar texto.
 - [x] Migration aditiva `0003_prayer_requests.sql` versionada, validada por `npm run migration:check` e aplicada manualmente pelo usuario no Supabase SQL Editor aprovado.
@@ -71,6 +73,7 @@
 - [x] Harness backend do ciclo ampliado passou com exit 0: typecheck, 60 testes, build, migration dry-run incluindo `0004` e smoke local.
 - [x] Migration `0004_admin_users_blocking.sql` aplicada manualmente no Supabase aprovado; verificacao REST redigida confirmou `profiles.blocked_at` existente (`HTTP 200`, `blockedAtExists=true`) e `npm run migration:check` seguiu OK.
 - [x] Ciclo admin operacional ampliado publicado/validado em producao pelo commit backend `a0067c4`, com endpoints sem token retornando `401`, CORS Vercel OK e smoke autenticado assistido OK.
+- [x] Melhorias locais 2026-06-04: `PATCH /v1/admin/lawyers/:id` atualiza dados completos e persiste cidade/UF do CEP; `PATCH /v1/admin/prayer-requests/:id` marca `read`/`received`; `GET/POST /v1/admin/partner-logos`, `POST /v1/admin/partner-logo-media` e `GET /v1/partner-logos` foram criados. Migration `0005_admin_prayers_partners.sql` versionada; backend `npm run harness` exit 0.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -111,6 +114,7 @@
 - [x] Apoiar spec 006 com contrato seguro de perfil/role (`GET /v1/me`) e harness backend exit 0.
 - [x] Apoiar spec 008 Parte 3 localmente com dashboard advogado e pedido de oracao.
 - [x] Apoiar painel admin com midia, oracoes e usuarios.
+- [x] Apoiar melhorias locais do painel admin com edicao completa, oracao lida e parceiros.
 
 ## Bloqueios
 
@@ -121,10 +125,11 @@
 - `psql` nao esta disponivel no ambiente local; migrations dependem de aplicacao manual no SQL Editor.
 - `0003_prayer_requests.sql` foi aplicada manualmente no Supabase aprovado pelo usuario. A retencao operacional de `prayer_requests` esta formalizada e testada; apply destrutivo real deve ocorrer somente em janela aprovada quando houver pedidos antigos elegiveis.
 - Admin operacional ampliado esta publicado e validado em producao. `0004_admin_users_blocking.sql` foi aplicada manualmente pelo usuario no Supabase SQL Editor aprovado; verificacao REST redigida confirmou `profiles.blocked_at` existente (`200`, `blockedAtExists=true`).
+- Melhorias locais de edicao/oracao/parceiros aguardam aplicacao manual da migration `0005_admin_prayers_partners.sql` no Supabase antes de deploy/smoke publicado.
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 - Cadastro cliente esta publicado e validado no backend Railway. Se o APK/mobile em uso nao contiver a UI nova, o rebuild/publicacao mobile deve ocorrer em ciclo separado.
 
 ## Proximo Passo
 
-Backend do admin operacional ampliado segue `ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK`. Parte 3 da spec 008 segue `SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK`; apply destrutivo da spec 007 e de oracao segue independente e somente com janela aprovada.
+Backend do admin operacional ampliado segue `ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK` em producao. O pacote local de edicao/oracao/parceiros esta `BACK_ADMIN_MELHORIAS_OPERACIONAIS_LOCAL_OK`; aplicar `0005_admin_prayers_partners.sql` antes de publicar/validar em producao.

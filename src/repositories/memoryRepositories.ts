@@ -2,18 +2,21 @@ import type { LawyerCreate, LawyerPatch } from "../contracts/api.js";
 import { legalAreas } from "../modules/areas/legalAreas.js";
 import type {
   AuditLogRepository,
-  LawyerCoordinates,
   LawyerDashboardRepository,
   LawyerMediaRepository,
+  LawyerOfficeLocation,
   LawyerRecord,
   LawyerRepository,
   LegalSpecialtyRepository,
   MatchEventRepository,
   MatchRepository,
   NearestLawyerInput,
+  PartnerLogoRecord,
+  PartnerLogoRepository,
   Profile,
   ProfileRepository,
   PublicLawyerProfileRepository,
+  StoredAdminImage,
   StoredLawyerImage,
   PrayerRequestRepository,
   Repositories
@@ -26,9 +29,11 @@ const prayerRequests: Array<{
   clientProfileId: string | null;
   message: string;
   anonymous: boolean;
-  status: "received";
+  status: "received" | "read";
   createdAt: string;
+  readAt?: string | null;
 }> = [];
+const partnerLogos: PartnerLogoRecord[] = [];
 
 const seedCreatedAt = "2026-06-03T00:00:00.000Z";
 
@@ -135,6 +140,23 @@ class MemoryProfileRepository implements ProfileRepository {
     });
   }
 
+  async updateLawyerProfile(
+    profileId: string,
+    input: Partial<Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">>
+  ) {
+    const existing = profiles.get(profileId);
+    if (!existing) return;
+    profiles.set(profileId, {
+      ...existing,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.email !== undefined ? { email: input.email } : {}),
+      ...(input.whatsapp !== undefined ? { phone: input.whatsapp } : {}),
+      ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl ?? null } : {}),
+      ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl ?? null } : {}),
+      updatedAt: new Date().toISOString()
+    });
+  }
+
   async updateBlocked(profileId: string, blocked: boolean) {
     const existing = profiles.get(profileId);
     if (!existing) return null;
@@ -165,15 +187,17 @@ class MemoryLawyerRepository implements LawyerRepository {
     return lawyers.get(id) ?? null;
   }
 
-  async create(input: LawyerCreate, coordinates?: LawyerCoordinates) {
+  async create(input: LawyerCreate, location?: LawyerOfficeLocation) {
     const profile = await this.profileRepository.createLawyerProfile(input);
     const now = new Date().toISOString();
     const lawyer: LawyerRecord = {
       id: crypto.randomUUID(),
       profileId: profile.id,
       ...input,
-      officeLat: coordinates?.lat ?? null,
-      officeLng: coordinates?.lng ?? null,
+      officeCity: location?.address?.city ?? null,
+      officeState: location?.address?.state ?? null,
+      officeLat: location?.coordinates?.lat ?? null,
+      officeLng: location?.coordinates?.lng ?? null,
       createdAt: now,
       updatedAt: now
     };
@@ -181,14 +205,16 @@ class MemoryLawyerRepository implements LawyerRepository {
     return lawyer;
   }
 
-  async update(id: string, patch: LawyerPatch, coordinates?: LawyerCoordinates) {
+  async update(id: string, patch: LawyerPatch, location?: LawyerOfficeLocation) {
     const existing = lawyers.get(id);
     if (!existing) return null;
+    await this.profileRepository.updateLawyerProfile(existing.profileId, patch);
 
     const updated: LawyerRecord = {
       ...existing,
       ...patch,
-      ...(coordinates ? { officeLat: coordinates.lat, officeLng: coordinates.lng } : {}),
+      ...(location?.address ? { officeCity: location.address.city, officeState: location.address.state } : {}),
+      ...(location?.coordinates ? { officeLat: location.coordinates.lat, officeLng: location.coordinates.lng } : {}),
       updatedAt: new Date().toISOString()
     };
     lawyers.set(id, updated);
@@ -241,7 +267,7 @@ const matchFixtures: MatchFixture[] = [
     avatarUrl: "https://example.test/ana-avatar.jpg",
     coverUrl: "https://example.test/ana-cover.jpg",
     miniBio: "Atuacao consultiva em direito civil.",
-    fullBio: "Perfil profissional aprovado para testes de contrato publico seguro."
+    fullBio: "Perfil profissional aprovado para testes de contrato publico seguro.",
   },
   {
     id: "fixture-lawyer-rj",
@@ -396,33 +422,51 @@ class MemoryPrayerRequestRepository implements PrayerRequestRepository {
       message: input.message,
       anonymous: input.anonymous,
       status: "received" as const,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      readAt: null
     };
     prayerRequests.push(request);
     return {
       id: request.id,
       status: request.status,
-      createdAt: request.createdAt
+      createdAt: request.createdAt,
+      readAt: request.readAt ?? null
+    };
+  }
+
+  private toAdminRecord(request: (typeof prayerRequests)[number]) {
+    const client = request.clientProfileId ? profiles.get(request.clientProfileId) : null;
+    return {
+      id: request.id,
+      message: request.message,
+      anonymous: request.anonymous,
+      status: request.status,
+      createdAt: request.createdAt,
+      readAt: request.readAt ?? null,
+      client:
+        client && !request.anonymous
+          ? { id: client.id, name: client.name, email: client.email }
+          : null
     };
   }
 
   async listAdmin() {
     return [...prayerRequests]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((request) => {
-        const client = request.clientProfileId ? profiles.get(request.clientProfileId) : null;
-        return {
-          id: request.id,
-          message: request.message,
-          anonymous: request.anonymous,
-          status: request.status,
-          createdAt: request.createdAt,
-          client:
-            client && !request.anonymous
-              ? { id: client.id, name: client.name, email: client.email }
-              : null
-        };
-      });
+      .map((request) => this.toAdminRecord(request));
+  }
+
+  async updateStatus(id: string, status: "received" | "read") {
+    const index = prayerRequests.findIndex((request) => request.id === id);
+    if (index === -1) return null;
+    const existing = prayerRequests[index]!;
+    const updated = {
+      ...existing,
+      status,
+      readAt: status === "read" ? existing.readAt ?? new Date().toISOString() : null
+    };
+    prayerRequests[index] = updated;
+    return this.toAdminRecord(updated);
   }
 }
 
@@ -442,6 +486,45 @@ class MemoryLawyerMediaRepository implements LawyerMediaRepository {
   }
 }
 
+class MemoryPartnerLogoRepository implements PartnerLogoRepository {
+  async listAdmin() {
+    return [...partnerLogos].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listPublic() {
+    return (await this.listAdmin()).filter((partner) => partner.active);
+  }
+
+  async create(input: Parameters<PartnerLogoRepository["create"]>[0]) {
+    const now = new Date().toISOString();
+    const partner: PartnerLogoRecord = {
+      id: crypto.randomUUID(),
+      name: input.name,
+      logoUrl: input.logoUrl,
+      websiteUrl: input.websiteUrl ?? null,
+      active: input.active,
+      createdAt: now,
+      updatedAt: now
+    };
+    partnerLogos.unshift(partner);
+    return partner;
+  }
+
+  async uploadLogo(input: Parameters<PartnerLogoRepository["uploadLogo"]>[0]): Promise<StoredAdminImage> {
+    const extensionByMime = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp"
+    } as const;
+    const path = `partners/logos/${crypto.randomUUID()}.${extensionByMime[input.mimeType]}`;
+    return {
+      path,
+      contentType: input.mimeType,
+      url: `https://storage.example.test/${path}`
+    };
+  }
+}
+
 export function createMemoryRepositories(): Repositories {
   const profileRepository = new MemoryProfileRepository();
   return {
@@ -452,6 +535,7 @@ export function createMemoryRepositories(): Repositories {
     lawyerDashboards: new MemoryLawyerDashboardRepository(),
     prayerRequests: new MemoryPrayerRequestRepository(),
     lawyerMedia: new MemoryLawyerMediaRepository(),
+    partnerLogos: new MemoryPartnerLogoRepository(),
     auditLogs: new MemoryAuditLogRepository(),
     matches: new MemoryMatchRepository(),
     matchEvents: new MemoryMatchEventRepository(),

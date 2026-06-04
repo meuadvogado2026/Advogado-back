@@ -3,7 +3,7 @@ import type { AppEnv } from "../../config/env.js";
 import { geocodeCepSchema, lawyerCreateSchema, lawyerPatchSchema } from "../../contracts/api.js";
 import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import { apiError } from "../../lib/httpError.js";
-import type { LawyerCoordinates, Repositories } from "../../repositories/types.js";
+import type { LawyerOfficeLocation, Repositories } from "../../repositories/types.js";
 import { GeocodingError, createGeocodingProvider, type Coordinates } from "../geocoding/geocodingService.js";
 
 /** Coordenada elegivel para match: finita e dentro dos limites geograficos. */
@@ -145,10 +145,11 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
         .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada valida."));
     }
 
-    const officeCoordinates: LawyerCoordinates | undefined = hasValidCoordinate
-      ? { lat: coordinates!.lat, lng: coordinates!.lng }
-      : undefined;
-    const lawyer = await repositories.lawyers.create(parsed.data, officeCoordinates);
+    const officeLocation: LawyerOfficeLocation = {
+      address: { city: address.city, state: address.state },
+      coordinates: hasValidCoordinate ? { lat: coordinates!.lat, lng: coordinates!.lng } : undefined
+    };
+    const lawyer = await repositories.lawyers.create(parsed.data, officeLocation);
     await repositories.auditLogs.record({
       actorProfileId: request.currentUser?.id,
       action: "admin.lawyers.create",
@@ -173,7 +174,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
 
     // Quando o CEP muda, re-geocodifica para manter a coordenada do escritorio consistente.
-    let officeCoordinates: LawyerCoordinates | undefined;
+    let officeLocation: LawyerOfficeLocation | undefined;
     let address: Awaited<ReturnType<typeof geocoding.lookupCep>> | undefined;
     if (parsed.data.officeCep) {
       const resolved = await resolveCoordinates(parsed.data.officeCep);
@@ -184,14 +185,18 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
         return reply.code(502).send(apiError("UPSTREAM_ERROR", "Falha ao geocodificar CEP."));
       }
       address = resolved.address;
-      if (resolved.coordinates !== null && isValidCoordinate(resolved.coordinates.lat, resolved.coordinates.lng)) {
-        officeCoordinates = { lat: resolved.coordinates.lat, lng: resolved.coordinates.lng };
-      }
+      officeLocation = {
+        address: { city: resolved.address.city, state: resolved.address.state },
+        coordinates:
+          resolved.coordinates !== null && isValidCoordinate(resolved.coordinates.lat, resolved.coordinates.lng)
+            ? { lat: resolved.coordinates.lat, lng: resolved.coordinates.lng }
+            : undefined
+      };
     }
 
     // Coordenada resultante apos o patch: a recem-geocodificada ou a ja persistida.
-    const resultingLat = officeCoordinates?.lat ?? existing.officeLat;
-    const resultingLng = officeCoordinates?.lng ?? existing.officeLng;
+    const resultingLat = officeLocation?.coordinates?.lat ?? existing.officeLat;
+    const resultingLng = officeLocation?.coordinates?.lng ?? existing.officeLng;
     const targetStatus = parsed.data.status ?? existing.status;
 
     // Criterio de aceite (spec 002): nao permitir aprovar sem coordenada valida.
@@ -201,7 +206,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
         .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada valida."));
     }
 
-    const lawyer = await repositories.lawyers.update(id, parsed.data, officeCoordinates);
+    const lawyer = await repositories.lawyers.update(id, parsed.data, officeLocation);
     if (!lawyer) {
       return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
     }
@@ -211,7 +216,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       action: "admin.lawyers.update",
       entityType: "lawyer_profile",
       entityId: lawyer.id,
-      metadata: { persistence: repositories.mode, regeocoded: Boolean(officeCoordinates) }
+      metadata: { persistence: repositories.mode, regeocoded: Boolean(officeLocation?.coordinates) }
     });
 
     return { lawyer, address };

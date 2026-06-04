@@ -18,6 +18,7 @@
 - `GET /v1/areas`
 - `POST /v1/match` - exige Bearer token (`client` ou `admin`); ver contrato abaixo
 - `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client` ou `admin`)
+- `GET /v1/partner-logos` - lista publica segura de logos ativas para rodape futuro do mobile
 - `POST /v1/prayer-requests` - implementado na spec 008 Parte 3; exige Bearer token `client`
 - `POST /v1/lawyers/:id/events`
 - `POST /v1/lawyers/:id/urgent-calls`
@@ -39,6 +40,10 @@
 - `POST /v1/admin/geocode/cep`
 - `POST /v1/admin/lawyer-media` - upload server-side de foto/capa do advogado
 - `GET /v1/admin/prayer-requests` - leitura operacional dos pedidos de oracao
+- `PATCH /v1/admin/prayer-requests/:id` - marca pedido como `read`/`received`
+- `GET /v1/admin/partner-logos` - listagem operacional de logos de parceiros
+- `POST /v1/admin/partner-logo-media` - upload server-side de logo de parceiro
+- `POST /v1/admin/partner-logos` - cadastro de parceiro com logo HTTPS
 - `GET /v1/admin/users` - listagem segura de usuarios cadastrados
 - `PATCH /v1/admin/users/:id` - bloqueio/desbloqueio de usuario
 - `GET /v1/admin/urgent-calls`
@@ -78,6 +83,12 @@ partir de `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste a
 principal/secundarias em `lawyer_specialties`. A regra de aprovacao continua bloqueando
 `approved` sem coordenada valida.
 
+`PATCH /v1/admin/lawyers/:id` aceita os mesmos campos do cadastro de advogado para
+edicao operacional. Quando `officeCep` e enviado, a rota reconsulta o CEP, persiste
+`officeCity`/`officeState` e atualiza coordenada/PostGIS quando houver geocoding
+valido. Nome, email, WhatsApp, foto e capa sao atualizados em `profiles`; OAB, bio,
+status, endereco e especialidades permanecem em `lawyer_profiles`/`lawyer_specialties`.
+
 ## Admin operacional - midia, oracoes e usuarios
 
 `POST /v1/admin/lawyer-media` requer role `admin` e recebe:
@@ -92,8 +103,17 @@ Aceita apenas `image/jpeg`, `image/png` e `image/webp`; rejeita arquivos acima d
 `GET /v1/admin/prayer-requests` retorna os ultimos pedidos para operacao admin:
 
 ```json
-{ "requests": [{ "id": "...", "message": "...", "anonymous": true, "status": "received", "createdAt": "..." }] }
+{ "requests": [{ "id": "...", "message": "...", "anonymous": true, "status": "received", "createdAt": "...", "readAt": null }] }
 ```
+
+`PATCH /v1/admin/prayer-requests/:id` recebe `{ "status": "read" }` ou
+`{ "status": "received" }`. Ao marcar como lida, `readAt` e preenchido. O texto segue
+visivel apenas para admin autenticado e nao e ecoado na rota publica de envio.
+
+`POST /v1/admin/partner-logo-media` recebe `{ "kind": "partnerLogo", "fileName": "...", "mimeType": "image/png", "base64Data": "..." }`,
+aceita JPG/PNG/WebP ate 2MB e retorna URL publica segura. `POST /v1/admin/partner-logos`
+salva `{ "name": "...", "logoUrl": "https://...", "websiteUrl": null, "active": true }`.
+`GET /v1/partner-logos` retorna somente parceiros ativos para consumo futuro no mobile.
 
 `GET /v1/admin/users` retorna usuarios cadastrados com identidade operacional,
 role, telefone opcional, status de bloqueio e vinculo de advogado quando existir.
