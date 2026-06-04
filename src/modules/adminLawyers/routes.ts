@@ -174,10 +174,17 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
 
     // Quando o CEP muda, re-geocodifica para manter a coordenada do escritorio consistente.
+    // Se o admin aprova um legado sem coordenada, tenta recuperar usando o CEP ja salvo.
     let officeLocation: LawyerOfficeLocation | undefined;
     let address: Awaited<ReturnType<typeof geocoding.lookupCep>> | undefined;
-    if (parsed.data.officeCep) {
-      const resolved = await resolveCoordinates(parsed.data.officeCep);
+    const shouldRecoverMissingCoordinate =
+      (parsed.data.status ?? existing.status) === "approved" &&
+      !isValidCoordinate(existing.officeLat, existing.officeLng) &&
+      Boolean(existing.officeCep);
+    const cepToResolve = parsed.data.officeCep ?? (shouldRecoverMissingCoordinate ? existing.officeCep : undefined);
+
+    if (cepToResolve) {
+      const resolved = await resolveCoordinates(cepToResolve);
       if (resolved.kind === "invalid") {
         return reply.code(422).send(apiError("VALIDATION_ERROR", "CEP invalido ou nao encontrado."));
       }

@@ -466,11 +466,11 @@ describe("foundation API", () => {
     expect(typeof body.coordinates.lat).toBe("number");
   });
 
-  it("blocks approving a lawyer that has no valid coordinate", async () => {
+  it("blocks approving a lawyer when the stored CEP cannot recover a valid coordinate", async () => {
     // Semeia um advogado draft sem coordenada direto no repo em memoria
     // (mesmo Map global usado pela app), sem passar pelo geocoding.
     const repos = createMemoryRepositories();
-    const draft = await repos.lawyers.create(draftWithoutCoordinate({ email: "block-approve@example.test" }));
+    const draft = await repos.lawyers.create(draftWithoutCoordinate({ email: "block-approve@example.test", officeCep: "123" }));
     expect(draft.officeLat ?? null).toBeNull();
 
     const app = await buildApp();
@@ -496,6 +496,28 @@ describe("foundation API", () => {
       url: `/v1/admin/lawyers/${draft.id}`,
       headers: ADMIN,
       payload: { status: "approved", officeCep: "01001-000" }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.lawyer.status).toBe("approved");
+    expect(body.lawyer.officeCity).toBeTruthy();
+    expect(body.lawyer.officeState).toBeTruthy();
+    expect(typeof body.lawyer.officeLat).toBe("number");
+    expect(typeof body.lawyer.officeLng).toBe("number");
+  });
+
+  it("recovers missing coordinates from the stored CEP when approving a legacy lawyer", async () => {
+    const repos = createMemoryRepositories();
+    const draft = await repos.lawyers.create(draftWithoutCoordinate({ email: "approve-legacy-cep@example.test" }));
+
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/lawyers/${draft.id}`,
+      headers: ADMIN,
+      payload: { status: "approved" }
     });
     await app.close();
 
