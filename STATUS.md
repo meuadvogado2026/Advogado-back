@@ -1,8 +1,8 @@
 # Backend Status - Meu Advogado 2.0
 
 **Ultima atualizacao:** 2026-06-03
-**Fase:** BACKEND / MATCH MOBILE BUGFIX
-**Veredito:** MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+**Fase:** BACKEND / CADASTRO CLIENTE MOBILE
+**Veredito:** CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / ADMIN_GESTAO_ADVOGADOS_SMOKE_AUTH_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
 
 ## Producao (Railway)
 
@@ -41,6 +41,7 @@
 - [x] Admin real validado com `200` em rota admin; advogado e cliente validados com `403`.
 - [x] Ambiente backend passou a ser governado pela `.codex/` unica da raiz; copia local `Meu Advogado 2.0 - back/.codex` removida.
 - [x] Spec 006: `GET /v1/me` implementado para retornar identidade/role segura (`id`, `email`, `role`) sem token/service role/payload sensivel.
+- [x] `POST /v1/auth/signup-client` implementado localmente para cadastro publico de cliente: cria Supabase Auth via service role server-side, cria `profiles.role=client` com mesmo id e responde sem senha/token/segredo. Em modo memory, contrato e smoke passam sem Supabase real.
 - [x] Spec 007: mecanismo backend de retencao de `match_events` implementado com comando `npm run retention:match-events`, dry-run padrao, retencao de 90 dias e apply bloqueado por confirmacao explicita.
 - [x] Checagem publica Railway sem credenciais executada antes do redeploy para admin producao: `/health` `200`, `/v1/areas` `200`, `/v1/admin/lawyers` sem token `401`, `POST /v1/admin/geocode/cep` sem token `401`, mas `GET /v1/me` retornou `404`.
 - [x] Commit backend `e621676` publicado no GitHub/Railway com `GET /v1/me` e fallback CORS de producao no codigo.
@@ -61,6 +62,7 @@
 - [x] Spec 009 backend implementada localmente: `GET /v1/admin/lawyers` em modo Supabase agora hidrata `name`, `email`, `mainAreaId` e `secondaryAreaIds` via `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste `lawyer_specialties` com area principal/secundarias.
 - [x] Harness backend da spec 009 passou com exit code 0: typecheck, 51 testes, build, migration dry-run e smoke local.
 - [x] Bugfix do match publicado: falha de `match_events.record` nao bloqueia `matched`/`empty`; teste de regressao adicionado, harness backend exit 0 e `prod:smoke` Railway exit 0.
+- [x] Harness backend do cadastro cliente passou em 2026-06-03: typecheck, 55 testes, build, migration dry-run e smoke local com signup publico sem token/senha na resposta.
 
 ## Match Real Geoespacial (spec 001)
 
@@ -112,6 +114,7 @@
 - Provider real BrasilAPI + Nominatim so e exercitado fora de teste (testes usam stub/fetch mockado); validar contra os servicos reais exige `GEOCODING_PROVIDER=nominatim` e rede.
 - Proximos ciclos devem ser iniciados pela raiz do projeto para carregar a governanca central `.codex/` e specs em `.codex/specs/`.
 - Spec 009 backend ainda precisa publicacao Railway e smoke proporcional pos-deploy junto com o admin Vercel.
+- `POST /v1/auth/signup-client` ainda precisa publicacao Railway para o cadastro funcionar em APK/ambiente mobile apontado para producao.
 
 ## Proximo Passo
 

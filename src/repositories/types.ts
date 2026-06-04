@@ -41,6 +41,7 @@ export type LawyerCoordinates = { lat: number; lng: number };
 
 export interface ProfileRepository {
   getById(id: string): Promise<Profile | null>;
+  createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile>;
   createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile>;
   updateVisualFields(profileId: string, input: Pick<LawyerVisualFields, "avatarUrl" | "coverUrl">): Promise<void>;
 }

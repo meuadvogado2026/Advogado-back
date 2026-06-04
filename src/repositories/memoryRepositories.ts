@@ -46,6 +46,17 @@ class MemoryProfileRepository implements ProfileRepository {
     return profiles.get(id) ?? null;
   }
 
+  async createClientProfile(input: { id: string; name: string; email: string }) {
+    const profile: Profile = {
+      id: input.id,
+      role: "client",
+      name: input.name,
+      email: input.email
+    };
+    profiles.set(profile.id, profile);
+    return profile;
+  }
+
   async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">) {
     const profile: Profile = {
       id: crypto.randomUUID(),

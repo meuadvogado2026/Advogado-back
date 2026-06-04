@@ -9,6 +9,7 @@
 
 ## Auth/Profile
 
+- `POST /v1/auth/signup-client` - cadastro publico de cliente; cria Supabase Auth + `profiles.role=client` no backend
 - `GET /v1/me` - implementado na spec 006 para validar identidade/role sem expor campos sensiveis
 - `PATCH /v1/me`
 
@@ -72,6 +73,27 @@ Em modo Supabase, o repositorio hidrata `name`, `email`, imagens seguras e areas
 partir de `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste area
 principal/secundarias em `lawyer_specialties`. A regra de aprovacao continua bloqueando
 `approved` sem coordenada valida.
+
+## POST /v1/auth/signup-client
+
+Rota publica para cadastro de cliente. O backend cria o usuario no Supabase Auth com
+credencial server-side e cria o profile de dominio com `role=client`. Advogado segue
+cadastrado somente pelo admin.
+
+Request:
+
+```json
+{ "name": "Cliente Nome", "email": "cliente@example.com", "password": "senha-segura" }
+```
+
+Resposta `201`:
+
+```json
+{ "user": { "id": "...", "email": "cliente@example.com", "role": "client" }, "persistence": "supabase" }
+```
+
+A resposta nunca retorna senha, token, refresh token ou service role. Payload invalido
+responde `422`; sem service role no backend Supabase responde `503`.
 
 ## POST /v1/match (match real geoespacial)
 

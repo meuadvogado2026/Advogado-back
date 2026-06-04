@@ -55,8 +55,15 @@ export const prayerRequestSchema = z.object({
   anonymous: z.boolean().default(true)
 });
 
+export const clientSignupSchema = z.object({
+  name: z.string().trim().min(3).max(120),
+  email: z.string().trim().email(),
+  password: z.string().min(8).max(72)
+});
+
 export type MatchRequest = z.infer<typeof matchRequestSchema>;
 export type LawyerCreate = z.infer<typeof lawyerCreateSchema>;
 export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
 export type GeocodeCep = z.infer<typeof geocodeCepSchema>;
 export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
+export type ClientSignup = z.infer<typeof clientSignupSchema>;

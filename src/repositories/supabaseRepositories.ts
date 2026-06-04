@@ -58,6 +58,39 @@ class SupabaseProfileRepository implements ProfileRepository {
     };
   }
 
+  async createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .insert({
+        id: input.id,
+        role: "client",
+        name: input.name,
+        email: input.email,
+        phone: null
+      })
+      .select("id, role, name, email, phone, avatar_url, cover_url")
+      .single();
+    assertSupabaseOk(error, "profiles.createClientProfile");
+    const row = data as {
+      id: string;
+      role: Profile["role"];
+      name: string;
+      email: string;
+      phone: string | null;
+      avatar_url: string | null;
+      cover_url: string | null;
+    };
+    return {
+      id: row.id,
+      role: row.role,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      avatarUrl: row.avatar_url,
+      coverUrl: row.cover_url
+    };
+  }
+
   async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile> {
     const { data, error } = await this.supabase
       .from("profiles")

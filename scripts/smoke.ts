@@ -10,6 +10,15 @@ const app = await buildApp();
 
 const health = await app.inject({ method: "GET", url: "/health" });
 const areas = await app.inject({ method: "GET", url: "/v1/areas" });
+const clientSignup = await app.inject({
+  method: "POST",
+  url: "/v1/auth/signup-client",
+  payload: {
+    name: "Cliente Smoke",
+    email: `cliente-smoke-${Date.now()}@example.test`,
+    password: "senha-segura-123"
+  }
+});
 const matchNoToken = await app.inject({
   method: "POST",
   url: "/v1/match",
@@ -57,6 +66,9 @@ const lawyerProfileOk =
 if (
   health.statusCode !== 200 ||
   areas.statusCode !== 200 ||
+  clientSignup.statusCode !== 201 ||
+  clientSignup.json().user?.role !== "client" ||
+  clientSignup.json().user?.token !== undefined ||
   matchNoToken.statusCode !== 401 ||
   !matchedOk ||
   !emptyOk ||
@@ -68,7 +80,7 @@ if (
 ) {
   throw new Error(
     `Smoke falhou: health=${health.statusCode}, areas=${areas.statusCode}, ` +
-      `matchNoToken=${matchNoToken.statusCode}, matched=${matchMatched.statusCode}/${matchMatched.json().status}, ` +
+      `signup=${clientSignup.statusCode}, matchNoToken=${matchNoToken.statusCode}, matched=${matchMatched.statusCode}/${matchMatched.json().status}, ` +
       `empty=${matchEmpty.statusCode}/${matchEmpty.json().status}, ` +
       `lawyerProfile=${lawyerProfileNoToken.statusCode}/${lawyerProfileForbidden.statusCode}/${lawyerProfileUnavailable.statusCode}/${lawyerProfileApproved.statusCode}, ` +
       `admin401=${adminWithoutToken.statusCode}`
@@ -77,6 +89,7 @@ if (
 
 console.log(
   `Smoke backend OK: /health, /v1/areas, match sem token=401, ` +
+    `signup cliente publico sem token/senha na resposta, ` +
     `matched (${matchMatched.json().distanceKm}km) e empty validados, ` +
     `perfil advogado 401/403/404/200, admin sem token=401.`
 );

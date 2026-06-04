@@ -287,6 +287,48 @@ describe("foundation API", () => {
     expect(response.json().user.token).toBeUndefined();
   });
 
+  it("creates a client user profile through the public signup boundary", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/signup-client",
+      payload: {
+        name: "Cliente Novo",
+        email: `cliente-novo-${Date.now()}@example.test`,
+        password: "senha-segura-123"
+      }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      user: {
+        email: expect.stringContaining("@example.test"),
+        role: "client"
+      },
+      persistence: "memory"
+    });
+    expect(response.json().user.password).toBeUndefined();
+    expect(response.json().user.token).toBeUndefined();
+  });
+
+  it("validates public client signup payload", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/signup-client",
+      payload: {
+        name: "A",
+        email: "email-invalido",
+        password: "curta"
+      }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe("VALIDATION_ERROR");
+  });
+
   it("requires auth on admin routes", async () => {
     const app = await buildApp();
     const response = await app.inject({ method: "GET", url: "/v1/admin/lawyers" });
