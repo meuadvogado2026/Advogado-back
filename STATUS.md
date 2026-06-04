@@ -12,7 +12,7 @@
 - `PORT=8080` fixada nas Variables; demais envs (NODE_ENV=production, SUPABASE_URL/ANON/SERVICE_ROLE, GEOCODING_PROVIDER=nominatim) setadas no painel.
 - Validado e2e com `npm run prod:smoke` (HTTP real contra a URL): /health 200, 6 areas, match SP/civil matched, perfil cliente 200 com allowlist segura, perfil sem token 401, SP/criminal empty, match sem token 401, admin geocode/cep 200 (persistence=supabase), admin lawyers 200, dashboard advogado 401/403/200 e prayer requests 401/403/422/201 sem ecoar texto; match_events e prayer_requests neutros do smoke limpos.
 - Parte 2 publicada na Railway apos push pela conta correta `meuadvogado2026`; checagem redigida confirmou campos visuais opcionais em `GET /v1/lawyers/:id` e `forbiddenFieldCount=0`.
-- Bugfix local pendente de publicacao: `POST /v1/match` nao deve retornar 500 se a persistencia de `match_events` falhar; a rota registra log sem coordenada/token e preserva a resposta para o cliente.
+- Bugfix publicado no commit `60d90ce`: `POST /v1/match` nao retorna 500 se a persistencia de `match_events` falhar; a rota registra log sem coordenada/token e preserva a resposta para o cliente. `prod:smoke` pos-push passou contra Railway.
 
 ## Concluido
 
@@ -60,7 +60,7 @@
 - [x] Pacote de retencao de `prayer_requests` versionado e publicado no repo oficial pelo commit `5434baa` (`Implement prayer requests retention`); smoke Railway pos-push passou com limpeza de `match_events` e `prayer_requests` neutros criados no teste.
 - [x] Spec 009 backend implementada localmente: `GET /v1/admin/lawyers` em modo Supabase agora hidrata `name`, `email`, `mainAreaId` e `secondaryAreaIds` via `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste `lawyer_specialties` com area principal/secundarias.
 - [x] Harness backend da spec 009 passou com exit code 0: typecheck, 51 testes, build, migration dry-run e smoke local.
-- [x] Bugfix local do match: falha de `match_events.record` nao bloqueia `matched`/`empty`; teste de regressao adicionado.
+- [x] Bugfix do match publicado: falha de `match_events.record` nao bloqueia `matched`/`empty`; teste de regressao adicionado, harness backend exit 0 e `prod:smoke` Railway exit 0.
 
 ## Match Real Geoespacial (spec 001)
 
