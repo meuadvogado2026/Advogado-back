@@ -35,7 +35,8 @@ O harness executa:
 - `GET /v1/admin/lawyers` sem token retorna `401`.
 - `GET /v1/admin/lawyers` com role errada retorna `403`.
 
-`POST /v1/admin/geocode/cep` fica para o ciclo de geocoding real.
+- `POST /v1/admin/geocode/cep` com CEP valido deve retornar endereco normalizado; quando o provider achar coordenada de confianca media/alta, o cadastro/aprovacao pode persistir coordenada.
+- CEP com endereco completo sem resultado no Nominatim deve tentar bairro/cidade antes de cair para cidade/UF ampla.
 
 ## Spec 007 - Retencao LGPD
 
@@ -55,5 +56,7 @@ Resultado em 2026-06-02: testes focados exit code 0; dry-run exit code 0 com `ma
 Resultado em 2026-06-03: testes focados exit code 0; dry-run exit code 0 com `matchedRequests=0`, `deletedRequests=0`, `applied=false`; harness backend exit code 0 com 50 testes; `prod:smoke` Railway exit code 0 com `prayerRequestsDeleted=2`.
 
 ## Evidencias
+
+- 2026-06-05 hotfix GEO/admin CEP: `npm run test -- --run tests/geocoding.test.ts tests/app.test.ts` exit 0 (59 testes), `npm run typecheck` exit 0, sonda real segura do CEP informado retornou `hasCoordinate=true`, `precision=cep_centroid`, `confidence=medium`, e `npm run harness` exit 0 (70 testes, build, migration dry-run e smoke local).
 
 Registrar comando, cwd, exit code, resultado e lacunas.

@@ -170,6 +170,19 @@ function confidenceFromNominatim(result: NominatimResult): Coordinates["confiden
   return "low";
 }
 
+function confidenceScore(confidence: Coordinates["confidence"]): number {
+  if (confidence === "high") return 3;
+  if (confidence === "medium") return 2;
+  return 1;
+}
+
+function nominatimQueryPart(value: string): string {
+  return value
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export class NominatimGeocodingProvider implements GeocodingProvider {
   private readonly brasilApiBaseUrl: string;
   private readonly nominatimBaseUrl: string;
@@ -242,18 +255,27 @@ export class NominatimGeocodingProvider implements GeocodingProvider {
 
     const queries: Array<{ query: string; precision: Coordinates["precision"] }> = [];
     const streetQuery = [address.street, address.neighborhood, address.city, address.state, "Brasil"]
+      .map(nominatimQueryPart)
       .filter((part) => part.length > 0)
       .join(", ");
-    const cityQuery = [address.city, address.state, "Brasil"].filter((part) => part.length > 0).join(", ");
+    const neighborhoodQuery = [address.neighborhood, address.city, address.state, "Brasil"]
+      .map(nominatimQueryPart)
+      .filter((part) => part.length > 0)
+      .join(", ");
+    const cityQuery = [address.city, address.state, "Brasil"].map(nominatimQueryPart).filter((part) => part.length > 0).join(", ");
     if (address.street || address.neighborhood) {
       queries.push({ query: streetQuery, precision: "street" });
     }
-    if (cityQuery && cityQuery !== streetQuery) {
+    if (neighborhoodQuery && !queries.some((item) => item.query === neighborhoodQuery)) {
+      queries.push({ query: neighborhoodQuery, precision: "cep_centroid" });
+    }
+    if (cityQuery && !queries.some((item) => item.query === cityQuery)) {
       queries.push({ query: cityQuery, precision: "cep_centroid" });
     }
 
+    let fallbackCoordinates: Coordinates | null = null;
     for (const { query, precision } of queries) {
-      const url = `${this.nominatimBaseUrl}/search?format=jsonv2&limit=1&countrycodes=br&q=${encodeURIComponent(query)}`;
+      const url = `${this.nominatimBaseUrl}/search?format=jsonv2&limit=5&countrycodes=br&q=${encodeURIComponent(query)}`;
 
       let response: Response;
       try {
@@ -272,22 +294,36 @@ export class NominatimGeocodingProvider implements GeocodingProvider {
       }
 
       const results = (await response.json()) as NominatimResult[];
-      const top = Array.isArray(results) ? results[0] : undefined;
-      if (!top) continue;
+      const candidates = (Array.isArray(results) ? results : [])
+        .map((result): Coordinates | null => {
+          const lat = Number(result.lat);
+          const lng = Number(result.lon);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return {
+            lat,
+            lng,
+            provider: "nominatim",
+            precision,
+            confidence: confidenceFromNominatim(result)
+          };
+        })
+        .filter((coordinates): coordinates is Coordinates => Boolean(coordinates))
+        .sort((left, right) => confidenceScore(right.confidence) - confidenceScore(left.confidence));
 
-      const lat = Number(top.lat);
-      const lng = Number(top.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const coordinates = candidates[0];
+      if (!coordinates) continue;
+      if (coordinates.confidence === "low") {
+        fallbackCoordinates ??= coordinates;
+        continue;
+      }
 
-      const coordinates: Coordinates = {
-        lat,
-        lng,
-        provider: "nominatim",
-        precision,
-        confidence: confidenceFromNominatim(top)
-      };
       this.coordCache.set(cacheKey, coordinates);
       return coordinates;
+    }
+
+    if (fallbackCoordinates) {
+      this.coordCache.set(cacheKey, fallbackCoordinates);
+      return fallbackCoordinates;
     }
 
     throw new GeocodingError("address_not_geocoded", "Endereco nao geocodificado.");

@@ -102,6 +102,7 @@ describe("NominatimGeocodingProvider.geocodeAddress", () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
       .mockResolvedValueOnce(jsonResponse([{ lat: "-23.55052", lon: "-46.633308", addresstype: "city" }]));
     const provider = buildProvider(fetchImpl as unknown as typeof fetch);
 
@@ -114,16 +115,48 @@ describe("NominatimGeocodingProvider.geocodeAddress", () => {
       precision: "cep_centroid",
       confidence: "low"
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(fetchImpl.mock.calls[2]?.[0]).toContain("Sao%20Paulo%2C%20SP%2C%20Brasil");
+  });
+
+  it("uses a medium-confidence neighborhood result before falling back to a broad city centroid", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          { lat: "-15.8690878", lon: "-48.0715818", addresstype: "railway" },
+          { lat: "-15.8734007", lon: "-48.0720049", addresstype: "suburb" }
+        ])
+      );
+    const provider = buildProvider(fetchImpl as unknown as typeof fetch);
+
+    const coordinates = await provider.geocodeAddress({
+      cep: "72309608",
+      street: "Quadra QR 323 Conjunto 8",
+      neighborhood: "Samambaia Sul (Samambaia)",
+      city: "Brasilia",
+      state: "DF"
+    });
+
+    expect(coordinates).toMatchObject({
+      lat: -15.8734007,
+      lng: -48.0720049,
+      provider: "nominatim",
+      precision: "cep_centroid",
+      confidence: "medium"
+    });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(fetchImpl.mock.calls[1]?.[0]).toContain("Sao%20Paulo%2C%20SP%2C%20Brasil");
+    expect(fetchImpl.mock.calls[1]?.[0]).toContain("Samambaia%20Sul");
+    expect(fetchImpl.mock.calls[1]?.[0]).toContain("limit=5");
   });
 
   it("returns address_not_geocoded when nominatim has no results", async () => {
-    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse([])).mockResolvedValueOnce(jsonResponse([]));
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse([])).mockResolvedValueOnce(jsonResponse([])).mockResolvedValueOnce(jsonResponse([]));
     const provider = buildProvider(fetchImpl as unknown as typeof fetch);
 
     await expect(provider.geocodeAddress(address)).rejects.toMatchObject({ reason: "address_not_geocoded" });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it("maps a non-ok response to provider_unavailable", async () => {
