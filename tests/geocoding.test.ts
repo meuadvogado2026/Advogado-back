@@ -4,6 +4,7 @@ import {
   NominatimGeocodingProvider,
   type CepAddress
 } from "../src/modules/geocoding/geocodingService.js";
+import { isMatchEligibleGeocoding } from "../src/modules/adminLawyers/routes.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -130,5 +131,31 @@ describe("NominatimGeocodingProvider.geocodeAddress", () => {
     const provider = buildProvider(fetchImpl as unknown as typeof fetch);
 
     await expect(provider.geocodeAddress(address)).rejects.toMatchObject({ reason: "provider_unavailable" });
+  });
+});
+
+describe("admin lawyer geocoding eligibility", () => {
+  it("does not treat low-confidence city centroid as match-eligible", () => {
+    expect(
+      isMatchEligibleGeocoding({
+        lat: -15.79,
+        lng: -47.88,
+        provider: "nominatim",
+        precision: "cep_centroid",
+        confidence: "low"
+      })
+    ).toBe(false);
+  });
+
+  it("keeps street-level coordinates eligible for match", () => {
+    expect(
+      isMatchEligibleGeocoding({
+        lat: -23.55,
+        lng: -46.63,
+        provider: "nominatim",
+        precision: "street",
+        confidence: "high"
+      })
+    ).toBe(true);
   });
 });

@@ -124,7 +124,7 @@ export class StubGeocodingProvider implements GeocodingProvider {
       lng: -46.633308,
       provider: "stub",
       precision: "cep_centroid",
-      confidence: "low"
+      confidence: "medium"
     };
     stubCoordinateCache.set(cacheKey, coordinates);
     return coordinates;

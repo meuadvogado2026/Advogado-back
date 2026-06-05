@@ -20,6 +20,15 @@ function isValidCoordinate(lat: number | null | undefined, lng: number | null | 
   );
 }
 
+export function isMatchEligibleGeocoding(coordinates: Coordinates | null | undefined): boolean {
+  if (!coordinates) return false;
+
+  return (
+    isValidCoordinate(coordinates.lat, coordinates.lng) &&
+    !(coordinates.precision === "cep_centroid" && coordinates.confidence === "low")
+  );
+}
+
 export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
   const geocoding = createGeocodingProvider(env);
@@ -49,7 +58,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
 
     try {
       const coordinates = await geocoding.geocodeAddress(address);
-      return { kind: "ok", address, coordinates };
+      return { kind: "ok", address, coordinates: isMatchEligibleGeocoding(coordinates) ? coordinates : null };
     } catch (error) {
       if (error instanceof GeocodingError && error.reason === "address_not_geocoded") {
         return { kind: "ok", address, coordinates: null };
@@ -72,6 +81,11 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       let note: string | undefined;
       try {
         coordinates = await geocoding.geocodeAddress(address);
+        if (!isMatchEligibleGeocoding(coordinates)) {
+          coordinates = null;
+          recoverable = true;
+          note = "Endereco normalizado, mas a coordenada retornada e ampla demais para calcular distancia confiavel. Ajuste a base de atendimento.";
+        }
       } catch (error) {
         // CEP normalizado, mas coordenada indisponivel: estado recuperavel (sem coordenada falsa).
         if (error instanceof GeocodingError && error.reason === "address_not_geocoded") {
@@ -136,7 +150,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
 
     const { address, coordinates } = resolved;
-    const hasValidCoordinate = coordinates !== null && isValidCoordinate(coordinates.lat, coordinates.lng);
+    const hasValidCoordinate = isMatchEligibleGeocoding(coordinates);
 
     // Criterio de aceite (spec 002): advogado aprovado para match deve ter coordenada valida.
     if (parsed.data.status === "approved" && !hasValidCoordinate) {
@@ -192,12 +206,10 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
         return reply.code(502).send(apiError("UPSTREAM_ERROR", "Falha ao geocodificar CEP."));
       }
       address = resolved.address;
+      const eligibleCoordinates = isMatchEligibleGeocoding(resolved.coordinates) ? resolved.coordinates : null;
       officeLocation = {
         address: { city: resolved.address.city, state: resolved.address.state },
-        coordinates:
-          resolved.coordinates !== null && isValidCoordinate(resolved.coordinates.lat, resolved.coordinates.lng)
-            ? { lat: resolved.coordinates.lat, lng: resolved.coordinates.lng }
-            : undefined
+        coordinates: eligibleCoordinates ? { lat: eligibleCoordinates.lat, lng: eligibleCoordinates.lng } : undefined
       };
     }
 
