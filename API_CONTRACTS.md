@@ -97,6 +97,11 @@ Senha, token, refresh token, action link e service role nunca sao retornados. Em
 `POST /v1/admin/lawyers/:id/access-invite` cria o convite e revincula o `profile_id`
 ao `auth.users.id` por RPC transacional.
 
+O convite usa `LAWYER_INVITE_REDIRECT_URL` (padrao:
+`https://advogado20admin.vercel.app/primeiro-acesso`) para evitar o Site URL global do
+Supabase apontar para `localhost`. Esse URL precisa estar permitido em Auth Redirect
+URLs no painel do Supabase.
+
 `PATCH /v1/admin/lawyers/:id` aceita os mesmos campos do cadastro de advogado para
 edicao operacional. Quando `officeCep` e enviado, a rota reconsulta o CEP, persiste
 `officeCity`/`officeState` e atualiza coordenada/PostGIS quando houver geocoding

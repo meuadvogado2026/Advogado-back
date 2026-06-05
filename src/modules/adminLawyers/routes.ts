@@ -58,7 +58,8 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       data: {
         name: input.name,
         role: "lawyer"
-      }
+      },
+      redirectTo: env.LAWYER_INVITE_REDIRECT_URL
     });
 
     if (error || !data.user) {

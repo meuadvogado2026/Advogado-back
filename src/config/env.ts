@@ -21,6 +21,7 @@ const envSchema = z.object({
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:5173,http://localhost:8081,https://advogado20admin.vercel.app"),
+  LAWYER_INVITE_REDIRECT_URL: z.string().url().default("https://advogado20admin.vercel.app/primeiro-acesso"),
   SUPABASE_URL: z.string().url().default("https://qpemxkiowiiklztgumqy.supabase.co"),
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
