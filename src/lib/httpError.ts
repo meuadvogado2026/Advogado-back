@@ -3,6 +3,8 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  | "CONFLICT"
+  | "PASSWORD_CHANGE_REQUIRED"
   | "NOT_IMPLEMENTED"
   | "UPSTREAM_ERROR";
 

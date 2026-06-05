@@ -23,11 +23,11 @@ export function createAuthPreHandler(env: AppEnv, repositories: Repositories, al
 
     if (env.NODE_ENV === "test") {
       if (token === env.TEST_AUTH_ADMIN_TOKEN) {
-        request.currentUser = { id: "test-admin-user", email: "admin@example.test", role: "admin" };
+        request.currentUser = { id: "test-admin-user", email: "admin@example.test", role: "admin", mustChangePassword: false };
       } else if (token === env.TEST_AUTH_CLIENT_TOKEN) {
-        request.currentUser = { id: "test-client-user", email: "client@example.test", role: "client" };
+        request.currentUser = { id: "test-client-user", email: "client@example.test", role: "client", mustChangePassword: false };
       } else if (token === env.TEST_AUTH_LAWYER_TOKEN) {
-        request.currentUser = { id: "test-lawyer-user", email: "lawyer@example.test", role: "lawyer" };
+        request.currentUser = { id: "test-lawyer-user", email: "lawyer@example.test", role: "lawyer", mustChangePassword: false };
       } else {
         return reply.code(401).send(apiError("UNAUTHORIZED", "Token invalido."));
       }
@@ -53,7 +53,9 @@ export function createAuthPreHandler(env: AppEnv, repositories: Repositories, al
       request.currentUser = {
         id: profile.id,
         email: profile.email,
-        role: profile.role
+        role: profile.role,
+        mustChangePassword: profile.mustChangePassword ?? false,
+        firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null
       };
     }
 

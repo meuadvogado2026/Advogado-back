@@ -35,47 +35,61 @@ function assertSupabaseOk(error: { message: string } | null, context: string) {
   }
 }
 
+const PROFILE_COLUMNS =
+  "id, role, name, email, phone, avatar_url, cover_url, blocked_at, must_change_password, access_invited_at, first_login_completed_at, created_at, updated_at";
+
+type ProfileRow = {
+  id: string;
+  role: Profile["role"];
+  name: string;
+  email: string;
+  phone: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  blocked_at: string | null;
+  must_change_password: boolean | null;
+  access_invited_at: string | null;
+  first_login_completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapProfile(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    role: row.role,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    avatarUrl: row.avatar_url,
+    coverUrl: row.cover_url,
+    blockedAt: row.blocked_at,
+    mustChangePassword: row.must_change_password ?? false,
+    accessInvitedAt: row.access_invited_at,
+    firstLoginCompletedAt: row.first_login_completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 class SupabaseProfileRepository implements ProfileRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
   async getById(id: string): Promise<Profile | null> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
+      .select(PROFILE_COLUMNS)
       .eq("id", id)
       .maybeSingle();
     assertSupabaseOk(error, "profiles.getById");
     if (!data) return null;
-    const row = data as {
-      id: string;
-      role: Profile["role"];
-      name: string;
-      email: string;
-      phone: string | null;
-      avatar_url: string | null;
-      cover_url: string | null;
-      blocked_at: string | null;
-      created_at: string;
-      updated_at: string;
-    };
-    return {
-      id: row.id,
-      role: row.role,
-      name: row.name,
-      email: row.email,
-      phone: row.phone,
-      avatarUrl: row.avatar_url,
-      coverUrl: row.cover_url,
-      blockedAt: row.blocked_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    return mapProfile(data as ProfileRow);
   }
 
   async listAdminUsers(): Promise<AdminUserRecord[]> {
     const { data: profilesData, error: profilesError } = await this.supabase
       .from("profiles")
-      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
+      .select(PROFILE_COLUMNS)
       .order("created_at", { ascending: false });
     assertSupabaseOk(profilesError, "profiles.listAdminUsers");
 
@@ -91,18 +105,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       ])
     );
 
-    return ((profilesData ?? []) as Array<{
-      id: string;
-      role: Profile["role"];
-      name: string;
-      email: string;
-      phone: string | null;
-      avatar_url: string | null;
-      cover_url: string | null;
-      blocked_at: string | null;
-      created_at: string;
-      updated_at: string;
-    }>).map((profile) => {
+    return ((profilesData ?? []) as ProfileRow[]).map((profile) => {
       const lawyer = lawyerByProfileId.get(profile.id);
       return {
         id: profile.id,
@@ -113,6 +116,9 @@ class SupabaseProfileRepository implements ProfileRepository {
         avatarUrl: profile.avatar_url,
         coverUrl: profile.cover_url,
         blockedAt: profile.blocked_at,
+        mustChangePassword: profile.must_change_password ?? false,
+        accessInvitedAt: profile.access_invited_at,
+        firstLoginCompletedAt: profile.first_login_completed_at,
         createdAt: profile.created_at,
         updatedAt: profile.updated_at,
         lawyerProfileId: lawyer?.id ?? null,
@@ -130,76 +136,40 @@ class SupabaseProfileRepository implements ProfileRepository {
         name: input.name,
         email: input.email,
         phone: null,
-        blocked_at: null
+        blocked_at: null,
+        must_change_password: false,
+        access_invited_at: null,
+        first_login_completed_at: null
       })
-      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
+      .select(PROFILE_COLUMNS)
       .single();
     assertSupabaseOk(error, "profiles.createClientProfile");
-    const row = data as {
-      id: string;
-      role: Profile["role"];
-      name: string;
-      email: string;
-      phone: string | null;
-      avatar_url: string | null;
-      cover_url: string | null;
-      blocked_at: string | null;
-      created_at: string;
-      updated_at: string;
-    };
-    return {
-      id: row.id,
-      role: row.role,
-      name: row.name,
-      email: row.email,
-      phone: row.phone,
-      avatarUrl: row.avatar_url,
-      coverUrl: row.cover_url,
-      blockedAt: row.blocked_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    return mapProfile(data as ProfileRow);
   }
 
-  async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile> {
+  async createLawyerProfile(
+    input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">,
+    access: { profileId?: string; accessInvitedAt?: string | null; mustChangePassword?: boolean } = {}
+  ): Promise<Profile> {
     const { data, error } = await this.supabase
       .from("profiles")
       .insert({
+        ...(access.profileId ? { id: access.profileId } : {}),
         role: "lawyer",
         name: input.name,
         email: input.email,
         phone: input.whatsapp,
         avatar_url: input.avatarUrl ?? null,
         cover_url: input.coverUrl ?? null,
-        blocked_at: null
+        blocked_at: null,
+        must_change_password: access.mustChangePassword ?? false,
+        access_invited_at: "accessInvitedAt" in access ? access.accessInvitedAt ?? null : null,
+        first_login_completed_at: null
       })
-      .select("id, role, name, email, phone, avatar_url, cover_url, blocked_at, created_at, updated_at")
+      .select(PROFILE_COLUMNS)
       .single();
     assertSupabaseOk(error, "profiles.createLawyerProfile");
-    const row = data as {
-      id: string;
-      role: Profile["role"];
-      name: string;
-      email: string;
-      phone: string | null;
-      avatar_url: string | null;
-      cover_url: string | null;
-      blocked_at: string | null;
-      created_at: string;
-      updated_at: string;
-    };
-    return {
-      id: row.id,
-      role: row.role,
-      name: row.name,
-      email: row.email,
-      phone: row.phone,
-      avatarUrl: row.avatar_url,
-      coverUrl: row.cover_url,
-      blockedAt: row.blocked_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    return mapProfile(data as ProfileRow);
   }
 
   async updateVisualFields(profileId: string, input: Pick<Profile, "avatarUrl" | "coverUrl">): Promise<void> {
@@ -243,6 +213,32 @@ class SupabaseProfileRepository implements ProfileRepository {
 
     const users = await this.listAdminUsers();
     return users.find((user) => user.id === profileId) ?? null;
+  }
+
+  async markFirstLoginCompleted(profileId: string): Promise<Profile | null> {
+    const existing = await this.getById(profileId);
+    if (!existing || existing.firstLoginCompletedAt) return existing;
+
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .update({ first_login_completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", profileId)
+      .select(PROFILE_COLUMNS)
+      .maybeSingle();
+    assertSupabaseOk(error, "profiles.markFirstLoginCompleted");
+    return data ? mapProfile(data as ProfileRow) : null;
+  }
+
+  async markPasswordChanged(profileId: string): Promise<Profile | null> {
+    const now = new Date().toISOString();
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .update({ must_change_password: false, first_login_completed_at: now, updated_at: now })
+      .eq("id", profileId)
+      .select(PROFILE_COLUMNS)
+      .maybeSingle();
+    assertSupabaseOk(error, "profiles.markPasswordChanged");
+    return data ? mapProfile(data as ProfileRow) : null;
   }
 }
 
@@ -293,6 +289,9 @@ type LawyerProfileSummary = {
   email: string;
   avatar_url: string | null;
   cover_url: string | null;
+  must_change_password: boolean | null;
+  access_invited_at: string | null;
+  first_login_completed_at: string | null;
 };
 
 type LawyerSpecialtyRow = {
@@ -356,7 +355,7 @@ class SupabaseLawyerRepository implements LawyerRepository {
 
     const { data: profilesData, error: profilesError } = await this.supabase
       .from("profiles")
-      .select("id, name, email, avatar_url, cover_url")
+      .select("id, name, email, avatar_url, cover_url, must_change_password, access_invited_at, first_login_completed_at")
       .in("id", profileIds);
     assertSupabaseOk(profilesError, "profiles.listLawyerSummaries");
 
@@ -385,6 +384,9 @@ class SupabaseLawyerRepository implements LawyerRepository {
         email: profile?.email ?? "",
         avatarUrl: profile?.avatar_url ?? null,
         coverUrl: profile?.cover_url ?? null,
+        mustChangePassword: profile?.must_change_password ?? false,
+        accessInvitedAt: profile?.access_invited_at ?? null,
+        firstLoginCompletedAt: profile?.first_login_completed_at ?? null,
         mainAreaId: mainArea?.specialty_id ?? "",
         secondaryAreaIds: specialties
           .filter((specialty) => specialty.specialty_id !== mainArea?.specialty_id)
@@ -415,8 +417,12 @@ class SupabaseLawyerRepository implements LawyerRepository {
     return lawyer ?? null;
   }
 
-  async create(input: LawyerCreate, location?: LawyerOfficeLocation): Promise<LawyerRecord> {
-    const profile = await this.profiles.createLawyerProfile(input);
+  async create(
+    input: LawyerCreate,
+    location?: LawyerOfficeLocation,
+    access?: { profileId?: string; accessInvitedAt?: string | null; mustChangePassword?: boolean }
+  ): Promise<LawyerRecord> {
+    const profile = await this.profiles.createLawyerProfile(input, access);
     const insertPayload: Record<string, unknown> = {
       profile_id: profile.id,
       status: input.status,
@@ -470,9 +476,27 @@ class SupabaseLawyerRepository implements LawyerRepository {
     return this.mapRow(data as LawyerRow, {
       name: input.name,
       email: input.email,
+      mustChangePassword: profile.mustChangePassword ?? false,
+      accessInvitedAt: profile.accessInvitedAt ?? null,
+      firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null,
       mainAreaId: input.mainAreaId,
       secondaryAreaIds: input.secondaryAreaIds
     });
+  }
+
+  async activateAccess(lawyerId: string, access: { profileId: string; accessInvitedAt?: string | null }): Promise<LawyerRecord | null> {
+    const existing = await this.getById(lawyerId);
+    if (!existing) return null;
+    if (existing.profileId === access.profileId) return existing;
+
+    const { error } = await this.supabase.rpc("activate_lawyer_profile_access", {
+      old_profile_id: existing.profileId,
+      new_profile_id: access.profileId,
+      invited_at: access.accessInvitedAt ?? new Date().toISOString()
+    });
+    assertSupabaseOk(error, "lawyer_profiles.activateAccess");
+
+    return this.getById(lawyerId);
   }
 
   async update(id: string, patch: LawyerPatch, location?: LawyerOfficeLocation): Promise<LawyerRecord | null> {

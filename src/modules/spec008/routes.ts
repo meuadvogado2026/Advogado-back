@@ -10,6 +10,12 @@ export async function registerSpec008Routes(app: FastifyInstance, env: AppEnv, r
   const requirePrayerRequester = createAuthPreHandler(env, repositories, ["client", "lawyer"]);
 
   app.get("/lawyer/me/dashboard", { preHandler: requireLawyer }, async (request, reply) => {
+    if (request.currentUser!.mustChangePassword) {
+      return reply
+        .code(403)
+        .send(apiError("PASSWORD_CHANGE_REQUIRED", "Troque sua senha antes de acessar o painel do advogado."));
+    }
+
     const dashboard = await repositories.lawyerDashboards.getByProfileId(request.currentUser!.id);
     if (!dashboard) {
       return reply.code(404).send(apiError("NOT_FOUND", "Dashboard do advogado nao disponivel."));

@@ -43,6 +43,9 @@ profiles.set("test-admin-user", {
   name: "Admin Teste",
   email: "admin@example.test",
   blockedAt: null,
+  mustChangePassword: false,
+  accessInvitedAt: null,
+  firstLoginCompletedAt: seedCreatedAt,
   createdAt: seedCreatedAt,
   updatedAt: seedCreatedAt
 });
@@ -52,6 +55,9 @@ profiles.set("test-client-user", {
   name: "Cliente Teste",
   email: "client@example.test",
   blockedAt: null,
+  mustChangePassword: false,
+  accessInvitedAt: null,
+  firstLoginCompletedAt: seedCreatedAt,
   createdAt: seedCreatedAt,
   updatedAt: seedCreatedAt
 });
@@ -63,6 +69,9 @@ profiles.set("test-lawyer-user", {
   avatarUrl: "https://example.test/lawyer-avatar.jpg",
   coverUrl: null,
   blockedAt: null,
+  mustChangePassword: false,
+  accessInvitedAt: seedCreatedAt,
+  firstLoginCompletedAt: seedCreatedAt,
   createdAt: seedCreatedAt,
   updatedAt: seedCreatedAt
 });
@@ -78,6 +87,9 @@ function toAdminUser(profile: Profile) {
     avatarUrl: profile.avatarUrl ?? null,
     coverUrl: profile.coverUrl ?? null,
     blockedAt: profile.blockedAt ?? null,
+    mustChangePassword: profile.mustChangePassword ?? false,
+    accessInvitedAt: profile.accessInvitedAt ?? null,
+    firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null,
     createdAt: profile.createdAt ?? seedCreatedAt,
     updatedAt: profile.updatedAt ?? seedCreatedAt,
     lawyerProfileId: lawyer?.id ?? null,
@@ -104,6 +116,9 @@ class MemoryProfileRepository implements ProfileRepository {
       name: input.name,
       email: input.email,
       blockedAt: null,
+      mustChangePassword: false,
+      accessInvitedAt: null,
+      firstLoginCompletedAt: null,
       createdAt: now,
       updatedAt: now
     };
@@ -111,10 +126,13 @@ class MemoryProfileRepository implements ProfileRepository {
     return profile;
   }
 
-  async createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">) {
+  async createLawyerProfile(
+    input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">,
+    access: { profileId?: string; accessInvitedAt?: string | null; mustChangePassword?: boolean } = {}
+  ) {
     const now = new Date().toISOString();
     const profile: Profile = {
-      id: crypto.randomUUID(),
+      id: access.profileId ?? crypto.randomUUID(),
       role: "lawyer",
       name: input.name,
       email: input.email,
@@ -122,6 +140,9 @@ class MemoryProfileRepository implements ProfileRepository {
       avatarUrl: input.avatarUrl ?? null,
       coverUrl: input.coverUrl ?? null,
       blockedAt: null,
+      mustChangePassword: access.mustChangePassword ?? false,
+      accessInvitedAt: "accessInvitedAt" in access ? access.accessInvitedAt ?? null : null,
+      firstLoginCompletedAt: null,
       createdAt: now,
       updatedAt: now
     };
@@ -168,6 +189,33 @@ class MemoryProfileRepository implements ProfileRepository {
     profiles.set(profileId, updated);
     return toAdminUser(updated);
   }
+
+  async markFirstLoginCompleted(profileId: string) {
+    const existing = profiles.get(profileId);
+    if (!existing) return null;
+    if (existing.firstLoginCompletedAt) return existing;
+    const updated = {
+      ...existing,
+      firstLoginCompletedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    profiles.set(profileId, updated);
+    return updated;
+  }
+
+  async markPasswordChanged(profileId: string) {
+    const existing = profiles.get(profileId);
+    if (!existing) return null;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      mustChangePassword: false,
+      firstLoginCompletedAt: existing.firstLoginCompletedAt ?? now,
+      updatedAt: now
+    };
+    profiles.set(profileId, updated);
+    return updated;
+  }
 }
 
 class MemoryLegalSpecialtyRepository implements LegalSpecialtyRepository {
@@ -187,8 +235,12 @@ class MemoryLawyerRepository implements LawyerRepository {
     return lawyers.get(id) ?? null;
   }
 
-  async create(input: LawyerCreate, location?: LawyerOfficeLocation) {
-    const profile = await this.profileRepository.createLawyerProfile(input);
+  async create(
+    input: LawyerCreate,
+    location?: LawyerOfficeLocation,
+    access?: { profileId?: string; accessInvitedAt?: string | null; mustChangePassword?: boolean }
+  ) {
+    const profile = await this.profileRepository.createLawyerProfile(input, access);
     const now = new Date().toISOString();
     const lawyer: LawyerRecord = {
       id: crypto.randomUUID(),
@@ -198,11 +250,44 @@ class MemoryLawyerRepository implements LawyerRepository {
       officeState: location?.address?.state ?? null,
       officeLat: location?.coordinates?.lat ?? null,
       officeLng: location?.coordinates?.lng ?? null,
+      mustChangePassword: profile.mustChangePassword ?? false,
+      accessInvitedAt: profile.accessInvitedAt ?? null,
+      firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null,
       createdAt: now,
       updatedAt: now
     };
     lawyers.set(lawyer.id, lawyer);
     return lawyer;
+  }
+
+  async activateAccess(lawyerId: string, access: { profileId: string; accessInvitedAt?: string | null }) {
+    const existing = lawyers.get(lawyerId);
+    if (!existing) return null;
+    const profile = await this.profileRepository.getById(existing.profileId);
+    if (!profile) return null;
+
+    const now = new Date().toISOString();
+    const updatedProfile: Profile = {
+      ...profile,
+      id: access.profileId,
+      mustChangePassword: false,
+      accessInvitedAt: access.accessInvitedAt ?? now,
+      firstLoginCompletedAt: null,
+      updatedAt: now
+    };
+    profiles.delete(existing.profileId);
+    profiles.set(updatedProfile.id, updatedProfile);
+
+    const updated: LawyerRecord = {
+      ...existing,
+      profileId: updatedProfile.id,
+      mustChangePassword: updatedProfile.mustChangePassword ?? false,
+      accessInvitedAt: updatedProfile.accessInvitedAt ?? null,
+      firstLoginCompletedAt: updatedProfile.firstLoginCompletedAt ?? null,
+      updatedAt: now
+    };
+    lawyers.set(lawyerId, updated);
+    return updated;
   }
 
   async update(id: string, patch: LawyerPatch, location?: LawyerOfficeLocation) {

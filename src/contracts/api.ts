@@ -91,6 +91,10 @@ export const clientSignupSchema = z.object({
   password: z.string().min(8).max(72)
 });
 
+export const changePasswordSchema = z.object({
+  newPassword: z.string().min(8).max(72)
+});
+
 export type MatchRequest = z.infer<typeof matchRequestSchema>;
 export type LawyerCreate = z.infer<typeof lawyerCreateSchema>;
 export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
@@ -102,3 +106,4 @@ export type AdminImageUpload = z.infer<typeof adminImageUploadSchema>;
 export type AdminLawyerImageUpload = z.infer<typeof adminLawyerImageUploadSchema>;
 export type AdminPartnerLogoCreate = z.infer<typeof adminPartnerLogoCreateSchema>;
 export type ClientSignup = z.infer<typeof clientSignupSchema>;
+export type ChangePassword = z.infer<typeof changePasswordSchema>;

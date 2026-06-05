@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
-import { clientSignupSchema } from "../../contracts/api.js";
+import { changePasswordSchema, clientSignupSchema } from "../../contracts/api.js";
 import { apiError } from "../../lib/httpError.js";
 import { createSupabaseAdminClient } from "../../lib/supabase.js";
 import type { Repositories } from "../../repositories/types.js";
@@ -78,11 +78,54 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
     }
   });
 
-  app.get("/me", { preHandler: requireAuthenticated }, async (request) => ({
-    user: {
-      id: request.currentUser!.id,
-      email: request.currentUser!.email,
-      role: request.currentUser!.role
+  app.post("/auth/change-password", { preHandler: requireAuthenticated }, async (request, reply) => {
+    const parsed = changePasswordSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .code(422)
+        .send(apiError("VALIDATION_ERROR", "Senha invalida.", parsed.error.issues));
     }
-  }));
+
+    if (repositories.mode !== "memory") {
+      const supabase = createSupabaseAdminClient(env);
+      if (!supabase) {
+        return reply.code(503).send(apiError("UPSTREAM_ERROR", "Troca de senha indisponivel sem credencial server-side."));
+      }
+
+      const { error } = await supabase.auth.admin.updateUserById(request.currentUser!.id, {
+        password: parsed.data.newPassword
+      });
+      if (error) {
+        return reply.code(422).send(apiError("VALIDATION_ERROR", "Nao foi possivel atualizar a senha."));
+      }
+    }
+
+    const profile = await repositories.profiles.markPasswordChanged(request.currentUser!.id);
+    return reply.code(200).send({
+      user: {
+        id: request.currentUser!.id,
+        email: request.currentUser!.email,
+        role: request.currentUser!.role,
+        mustChangePassword: profile?.mustChangePassword ?? false,
+        firstLoginCompletedAt: profile?.firstLoginCompletedAt ?? null
+      }
+    });
+  });
+
+  app.get("/me", { preHandler: requireAuthenticated }, async (request) => {
+    let profile =
+      request.currentUser!.role === "lawyer" && !request.currentUser!.mustChangePassword
+        ? await repositories.profiles.markFirstLoginCompleted(request.currentUser!.id)
+        : await repositories.profiles.getById(request.currentUser!.id);
+
+    return {
+      user: {
+        id: request.currentUser!.id,
+        email: request.currentUser!.email,
+        role: request.currentUser!.role,
+        mustChangePassword: profile?.mustChangePassword ?? request.currentUser!.mustChangePassword ?? false,
+        firstLoginCompletedAt: profile?.firstLoginCompletedAt ?? request.currentUser!.firstLoginCompletedAt ?? null
+      }
+    };
+  });
 }

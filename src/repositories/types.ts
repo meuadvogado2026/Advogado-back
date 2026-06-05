@@ -10,6 +10,9 @@ export type Profile = {
   avatarUrl?: string | null;
   coverUrl?: string | null;
   blockedAt?: string | null;
+  mustChangePassword?: boolean;
+  accessInvitedAt?: string | null;
+  firstLoginCompletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -23,6 +26,9 @@ export type AdminUserRecord = {
   avatarUrl?: string | null;
   coverUrl?: string | null;
   blockedAt?: string | null;
+  mustChangePassword: boolean;
+  accessInvitedAt?: string | null;
+  firstLoginCompletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   lawyerProfileId?: string | null;
@@ -50,6 +56,9 @@ export type LawyerRecord = LawyerCreate & {
   officeLng?: number | null;
   officeCity?: string | null;
   officeState?: string | null;
+  mustChangePassword?: boolean;
+  accessInvitedAt?: string | null;
+  firstLoginCompletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,10 +80,15 @@ export interface ProfileRepository {
   getById(id: string): Promise<Profile | null>;
   listAdminUsers(): Promise<AdminUserRecord[]>;
   createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile>;
-  createLawyerProfile(input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">): Promise<Profile>;
+  createLawyerProfile(
+    input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">,
+    access?: { profileId?: string; accessInvitedAt?: string | null; mustChangePassword?: boolean }
+  ): Promise<Profile>;
   updateLawyerProfile(profileId: string, input: Partial<Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">>): Promise<void>;
   updateVisualFields(profileId: string, input: Pick<LawyerVisualFields, "avatarUrl" | "coverUrl">): Promise<void>;
   updateBlocked(profileId: string, blocked: boolean): Promise<AdminUserRecord | null>;
+  markFirstLoginCompleted(profileId: string): Promise<Profile | null>;
+  markPasswordChanged(profileId: string): Promise<Profile | null>;
 }
 
 export interface LegalSpecialtyRepository {
@@ -84,8 +98,13 @@ export interface LegalSpecialtyRepository {
 export interface LawyerRepository {
   list(): Promise<LawyerRecord[]>;
   getById(id: string): Promise<LawyerRecord | null>;
-  create(input: LawyerCreate, location?: LawyerOfficeLocation): Promise<LawyerRecord>;
+  create(
+    input: LawyerCreate,
+    location?: LawyerOfficeLocation,
+    access?: { profileId?: string; accessInvitedAt?: string | null; mustChangePassword?: boolean }
+  ): Promise<LawyerRecord>;
   update(id: string, patch: LawyerPatch, location?: LawyerOfficeLocation): Promise<LawyerRecord | null>;
+  activateAccess(lawyerId: string, access: { profileId: string; accessInvitedAt?: string | null }): Promise<LawyerRecord | null>;
 }
 
 /** Allowlist publica do perfil profissional exposto ao cliente autenticado. */

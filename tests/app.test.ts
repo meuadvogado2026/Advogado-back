@@ -295,9 +295,31 @@ describe("foundation API", () => {
       user: {
         id: "test-admin-user",
         email: "admin@example.test",
-        role: "admin"
+        role: "admin",
+        mustChangePassword: false,
+        firstLoginCompletedAt: "2026-06-03T00:00:00.000Z"
       }
     });
+    expect(response.json().user.token).toBeUndefined();
+  });
+
+  it("changes the authenticated password without returning sensitive fields", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/change-password",
+      headers: LAWYER,
+      payload: { newPassword: "nova-senha-segura-123" }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user).toMatchObject({
+      id: "test-lawyer-user",
+      role: "lawyer",
+      mustChangePassword: false
+    });
+    expect(response.json().user.password).toBeUndefined();
     expect(response.json().user.token).toBeUndefined();
   });
 
@@ -403,6 +425,41 @@ describe("foundation API", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json().persistence).toBe("memory");
     expect(response.json().lawyer.profileId).toBeTruthy();
+    expect(response.json().access).toMatchObject({ status: "invited", delivery: "simulated" });
+    expect(response.json().access.password).toBeUndefined();
+    expect(response.json().access.token).toBeUndefined();
+  });
+
+  it("activates access for a legacy lawyer without returning invite secrets", async () => {
+    const repos = createMemoryRepositories();
+    const legacy = await repos.lawyers.create({
+      name: "Dra. Legado Acesso",
+      email: `legacy-access-${Date.now()}@example.test`,
+      whatsapp: "11911112222",
+      oabNumber: "111222",
+      oabState: "SP",
+      mainAreaId: "civil",
+      secondaryAreaIds: [],
+      officeCep: "01001000",
+      officeNumber: "10",
+      status: "draft"
+    });
+    const legacyProfile = await repos.profiles.getById(legacy.profileId);
+    expect(legacyProfile?.accessInvitedAt).toBeNull();
+
+    const app = await buildApp(repos);
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/admin/lawyers/${legacy.id}/access-invite`,
+      headers: ADMIN
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().lawyer.profileId).not.toBe(legacy.profileId);
+    expect(response.json().access).toMatchObject({ status: "invited", delivery: "simulated" });
+    expect(JSON.stringify(response.json())).not.toContain("password");
+    expect(JSON.stringify(response.json())).not.toContain("token");
   });
 
   it("lists admin lawyers with operational identity and area fields", async () => {

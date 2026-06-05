@@ -47,6 +47,44 @@ paths:
           description: Payload invalido ou Auth recusou o cadastro
         "503":
           description: Cadastro indisponivel sem credencial server-side
+  /v1/auth/change-password:
+    post:
+      summary: Troca senha do usuario autenticado
+      description: Atualiza senha via backend com service role server-side. Nao retorna senha, token ou segredo.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        "200":
+          description: Senha atualizada e estado de primeiro acesso retornado
+        "401":
+          description: Token ausente ou invalido
+        "422":
+          description: Senha invalida ou Auth recusou a atualizacao
+  /v1/me:
+    get:
+      summary: Retorna identidade autenticada segura
+      description: Retorna id, email, role e estado de primeiro acesso sem senha ou token.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usuario autenticado
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Perfil sem role autorizada ou usuario bloqueado
   /v1/match:
     post:
       summary: Solicita match por localizacao e areas juridicas
@@ -210,18 +248,42 @@ paths:
         "403":
           description: Role insuficiente
     post:
-      summary: Cadastra advogado com CEP obrigatorio
+      summary: Cadastra advogado com CEP obrigatorio e envia convite de acesso
       security:
         - bearerAuth: []
       responses:
         "201":
-          description: Advogado criado via repositorio backend
+          description: Advogado criado e convite Auth enviado sem retornar segredo
         "401":
           description: Token ausente ou invalido
         "403":
           description: Role insuficiente
         "422":
           description: Payload invalido
+  /v1/admin/lawyers/{id}/access-invite:
+    post:
+      summary: Ativa convite de primeiro acesso para advogado legado
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Convite enviado e perfil legado revinculado ao auth.users.id
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
+        "404":
+          description: Advogado ou perfil nao encontrado
+        "409":
+          description: Convite ja registrado
+        "422":
+          description: Auth recusou o convite
   /v1/lawyer/me/dashboard:
     get:
       summary: Retorna dashboard seguro do advogado logado

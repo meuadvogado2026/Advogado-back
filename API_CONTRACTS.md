@@ -10,7 +10,8 @@
 ## Auth/Profile
 
 - `POST /v1/auth/signup-client` - cadastro publico de cliente; cria Supabase Auth + `profiles.role=client` no backend
-- `GET /v1/me` - implementado na spec 006 para validar identidade/role sem expor campos sensiveis
+- `POST /v1/auth/change-password` - troca senha do usuario autenticado via backend; nao retorna senha/token
+- `GET /v1/me` - valida identidade/role e retorna estado seguro de primeiro acesso (`mustChangePassword`, `firstLoginCompletedAt`)
 - `PATCH /v1/me`
 
 ## Cliente
@@ -34,6 +35,7 @@
 - `GET /v1/admin/dashboard`
 - `GET /v1/admin/lawyers` - exige Bearer token com role `admin`
 - `POST /v1/admin/lawyers` - exige Bearer token com role `admin`
+- `POST /v1/admin/lawyers/:id/access-invite` - ativa convite de primeiro acesso para advogado legado
 - `GET /v1/admin/lawyers/:id`
 - `PATCH /v1/admin/lawyers/:id` - exige Bearer token com role `admin`
 - `PATCH /v1/admin/lawyers/:id/status`
@@ -83,6 +85,18 @@ partir de `profiles` e `lawyer_specialties`; `POST /v1/admin/lawyers` persiste a
 principal/secundarias em `lawyer_specialties`. A regra de aprovacao continua bloqueando
 `approved` sem coordenada valida.
 
+No fluxo atual, `POST /v1/admin/lawyers` tambem provisiona acesso do advogado no
+Supabase Auth via convite por e-mail. A resposta inclui apenas estado operacional:
+
+```json
+{ "access": { "status": "invited", "delivery": "email", "invitedAt": "2026-06-05T00:00:00Z" } }
+```
+
+Senha, token, refresh token, action link e service role nunca sao retornados. Em modo
+`memory`, `delivery` vem como `simulated`. Para advogados legados sem Auth vinculado,
+`POST /v1/admin/lawyers/:id/access-invite` cria o convite e revincula o `profile_id`
+ao `auth.users.id` por RPC transacional.
+
 `PATCH /v1/admin/lawyers/:id` aceita os mesmos campos do cadastro de advogado para
 edicao operacional. Quando `officeCep` e enviado, a rota reconsulta o CEP, persiste
 `officeCity`/`officeState` e atualiza coordenada/PostGIS quando houver geocoding
@@ -125,7 +139,7 @@ respondem `403`). A propria sessao admin nao pode se bloquear.
 
 Rota publica para cadastro de cliente. O backend cria o usuario no Supabase Auth com
 credencial server-side e cria o profile de dominio com `role=client`. Advogado segue
-cadastrado somente pelo admin.
+cadastrado somente pelo admin, mas recebe acesso por convite Auth administrado pelo backend.
 
 Request:
 

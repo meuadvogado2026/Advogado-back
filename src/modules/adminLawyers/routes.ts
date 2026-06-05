@@ -3,6 +3,7 @@ import type { AppEnv } from "../../config/env.js";
 import { geocodeCepSchema, lawyerCreateSchema, lawyerPatchSchema } from "../../contracts/api.js";
 import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import { apiError } from "../../lib/httpError.js";
+import { createSupabaseAdminClient } from "../../lib/supabase.js";
 import type { LawyerOfficeLocation, Repositories } from "../../repositories/types.js";
 import { GeocodingError, createGeocodingProvider, type Coordinates } from "../geocoding/geocodingService.js";
 
@@ -32,6 +33,56 @@ export function isMatchEligibleGeocoding(coordinates: Coordinates | null | undef
 export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
   const geocoding = createGeocodingProvider(env);
+
+  type ProvisionedLawyerAccess = {
+    profileId: string;
+    accessInvitedAt: string;
+    delivery: "email" | "simulated";
+    rollback?: () => Promise<void>;
+  };
+
+  async function provisionLawyerAccess(input: { email: string; name: string }): Promise<ProvisionedLawyerAccess | null> {
+    const invitedAt = new Date().toISOString();
+    if (repositories.mode === "memory") {
+      return {
+        profileId: crypto.randomUUID(),
+        accessInvitedAt: invitedAt,
+        delivery: "simulated"
+      };
+    }
+
+    const supabase = createSupabaseAdminClient(env);
+    if (!supabase) return null;
+
+    const { data, error } = await supabase.auth.admin.inviteUserByEmail(input.email, {
+      data: {
+        name: input.name,
+        role: "lawyer"
+      }
+    });
+
+    if (error || !data.user) {
+      throw new Error("LAWYER_ACCESS_INVITE_FAILED");
+    }
+
+    return {
+      profileId: data.user.id,
+      accessInvitedAt: data.user.invited_at ?? invitedAt,
+      delivery: "email",
+      rollback: async () => {
+        await supabase.auth.admin.deleteUser(data.user!.id);
+      }
+    };
+  }
+
+  function accessResponse(access: ProvisionedLawyerAccess | null) {
+    if (!access) return { status: "not_configured", delivery: "none" as const };
+    return {
+      status: "invited" as const,
+      delivery: access.delivery,
+      invitedAt: access.accessInvitedAt
+    };
+  }
 
   /**
    * Resolve a coordenada de um CEP. Distingue falhas:
@@ -163,16 +214,88 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       address: { city: address.city, state: address.state },
       coordinates: hasValidCoordinate ? { lat: coordinates!.lat, lng: coordinates!.lng } : undefined
     };
-    const lawyer = await repositories.lawyers.create(parsed.data, officeLocation);
+    let access: ProvisionedLawyerAccess | null;
+    try {
+      access = await provisionLawyerAccess({ email: parsed.data.email, name: parsed.data.name });
+    } catch {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Nao foi possivel enviar convite de acesso para este e-mail."));
+    }
+    if (!access) {
+      return reply.code(503).send(apiError("UPSTREAM_ERROR", "Convite de acesso indisponivel sem credencial server-side."));
+    }
+
+    let lawyer;
+    try {
+      lawyer = await repositories.lawyers.create(parsed.data, officeLocation, {
+        profileId: access.profileId,
+        accessInvitedAt: access.accessInvitedAt,
+        mustChangePassword: false
+      });
+    } catch (error) {
+      await access.rollback?.();
+      throw error;
+    }
+
     await repositories.auditLogs.record({
       actorProfileId: request.currentUser?.id,
       action: "admin.lawyers.create",
       entityType: "lawyer_profile",
       entityId: lawyer.id,
-      metadata: { persistence: repositories.mode, geocoded: hasValidCoordinate }
+      metadata: { persistence: repositories.mode, geocoded: hasValidCoordinate, access: accessResponse(access) }
     });
 
-    return reply.code(201).send({ lawyer, address, coordinates, persistence: repositories.mode });
+    return reply.code(201).send({ lawyer, address, coordinates, access: accessResponse(access), persistence: repositories.mode });
+  });
+
+  app.post("/admin/lawyers/:id/access-invite", { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await repositories.lawyers.getById(id);
+    if (!existing) {
+      return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
+    }
+
+    const profile = await repositories.profiles.getById(existing.profileId);
+    if (!profile) {
+      return reply.code(404).send(apiError("NOT_FOUND", "Perfil do advogado nao encontrado."));
+    }
+    if (profile.accessInvitedAt) {
+      return reply.code(409).send(apiError("CONFLICT", "Advogado ja possui convite de acesso registrado."));
+    }
+
+    let access: ProvisionedLawyerAccess | null;
+    try {
+      access = await provisionLawyerAccess({ email: existing.email, name: existing.name });
+    } catch {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Nao foi possivel enviar convite de acesso para este e-mail."));
+    }
+    if (!access) {
+      return reply.code(503).send(apiError("UPSTREAM_ERROR", "Convite de acesso indisponivel sem credencial server-side."));
+    }
+
+    let lawyer;
+    try {
+      lawyer = await repositories.lawyers.activateAccess(id, {
+        profileId: access.profileId,
+        accessInvitedAt: access.accessInvitedAt
+      });
+    } catch (error) {
+      await access.rollback?.();
+      throw error;
+    }
+    if (!lawyer) {
+      await access.rollback?.();
+      return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
+    }
+
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: "admin.lawyers.access_invite",
+      entityType: "lawyer_profile",
+      entityId: lawyer.id,
+      metadata: { persistence: repositories.mode, access: accessResponse(access) }
+    });
+
+    return reply.code(200).send({ lawyer, access: accessResponse(access), persistence: repositories.mode });
   });
 
   app.patch("/admin/lawyers/:id", { preHandler: requireAdmin }, async (request, reply) => {
