@@ -37,6 +37,29 @@ const partnerLogos: PartnerLogoRecord[] = [];
 
 const seedCreatedAt = "2026-06-03T00:00:00.000Z";
 
+function officeLocationStatus(input: {
+  officeLat?: number | null;
+  officeLng?: number | null;
+  officeLocationPresent?: boolean;
+  officeGeocodePrecision?: LawyerRecord["officeGeocodePrecision"];
+  officeGeocodeConfidence?: LawyerRecord["officeGeocodeConfidence"];
+}): LawyerRecord["officeLocationStatus"] {
+  const hasCoordinate =
+    typeof input.officeLat === "number" &&
+    typeof input.officeLng === "number" &&
+    Number.isFinite(input.officeLat) &&
+    Number.isFinite(input.officeLng) &&
+    input.officeLocationPresent === true;
+  if (!hasCoordinate) return "pending";
+  if (
+    input.officeGeocodeConfidence === "high" &&
+    (input.officeGeocodePrecision === "street" || input.officeGeocodePrecision === "manual")
+  ) {
+    return "validated";
+  }
+  return "needs_confirmation";
+}
+
 profiles.set("test-admin-user", {
   id: "test-admin-user",
   role: "admin",
@@ -250,12 +273,18 @@ class MemoryLawyerRepository implements LawyerRepository {
       officeState: location?.address?.state ?? null,
       officeLat: location?.coordinates?.lat ?? null,
       officeLng: location?.coordinates?.lng ?? null,
+      officeLocationPresent: Boolean(location?.coordinates),
+      officeGeocodeProvider: location?.geocode?.provider ?? null,
+      officeGeocodePrecision: location?.geocode?.precision ?? null,
+      officeGeocodeConfidence: location?.geocode?.confidence ?? null,
+      officeGeocodedAt: location?.geocode?.geocodedAt ?? null,
       mustChangePassword: profile.mustChangePassword ?? false,
       accessInvitedAt: profile.accessInvitedAt ?? null,
       firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null,
       createdAt: now,
       updatedAt: now
     };
+    lawyer.officeLocationStatus = officeLocationStatus(lawyer);
     lawyers.set(lawyer.id, lawyer);
     return lawyer;
   }
@@ -294,14 +323,36 @@ class MemoryLawyerRepository implements LawyerRepository {
     const existing = lawyers.get(id);
     if (!existing) return null;
     await this.profileRepository.updateLawyerProfile(existing.profileId, patch);
+    const { officeManualLocation: _officeManualLocation, ...storedPatch } = patch;
 
     const updated: LawyerRecord = {
       ...existing,
-      ...patch,
+      ...storedPatch,
       ...(location?.address ? { officeCity: location.address.city, officeState: location.address.state } : {}),
       ...(location?.coordinates ? { officeLat: location.coordinates.lat, officeLng: location.coordinates.lng } : {}),
+      ...(location?.coordinates ? { officeLocationPresent: true } : {}),
+      ...(location?.coordinates
+        ? {
+            officeGeocodeProvider: location.geocode?.provider ?? null,
+            officeGeocodePrecision: location.geocode?.precision ?? null,
+            officeGeocodeConfidence: location.geocode?.confidence ?? null,
+            officeGeocodedAt: location.geocode?.geocodedAt ?? null
+          }
+        : {}),
+      ...(location?.clearCoordinates
+        ? {
+            officeLat: null,
+            officeLng: null,
+            officeLocationPresent: false,
+            officeGeocodeProvider: null,
+            officeGeocodePrecision: null,
+            officeGeocodeConfidence: null,
+            officeGeocodedAt: null
+          }
+        : {}),
       updatedAt: new Date().toISOString()
     };
+    updated.officeLocationStatus = officeLocationStatus(updated);
     lawyers.set(id, updated);
     return updated;
   }
@@ -333,6 +384,8 @@ type MatchFixture = {
   linkedinUrl?: string | null;
   facebookUrl?: string | null;
   websiteUrl?: string | null;
+  officeGeocodePrecision: LawyerRecord["officeGeocodePrecision"];
+  officeGeocodeConfidence: LawyerRecord["officeGeocodeConfidence"];
 };
 
 /**
@@ -360,7 +413,9 @@ const matchFixtures: MatchFixture[] = [
     instagramUrl: "https://instagram.com/draanageo",
     linkedinUrl: "https://www.linkedin.com/in/draanageo",
     facebookUrl: "https://www.facebook.com/draanageo",
-    websiteUrl: "https://example.test/draanageo"
+    websiteUrl: "https://example.test/draanageo",
+    officeGeocodePrecision: "manual",
+    officeGeocodeConfidence: "high"
   },
   {
     id: "fixture-lawyer-rj",
@@ -373,7 +428,9 @@ const matchFixtures: MatchFixture[] = [
     areaIds: ["trabalhista"],
     status: "approved",
     oabNumber: "112233",
-    oabState: "RJ"
+    oabState: "RJ",
+    officeGeocodePrecision: "manual",
+    officeGeocodeConfidence: "high"
   },
   {
     // Mesmo perfil/area do SP, porem nao aprovado: nunca deve aparecer no match.
@@ -387,7 +444,9 @@ const matchFixtures: MatchFixture[] = [
     areaIds: ["civil"],
     status: "pending_review",
     oabNumber: "000000",
-    oabState: "SP"
+    oabState: "SP",
+    officeGeocodePrecision: "manual",
+    officeGeocodeConfidence: "high"
   }
 ];
 
@@ -409,6 +468,11 @@ class MemoryMatchRepository implements MatchRepository {
   async findNearest(input: NearestLawyerInput) {
     const candidate = matchFixtures
       .filter((fixture) => fixture.status === "approved")
+      .filter(
+        (fixture) =>
+          fixture.officeGeocodeConfidence === "high" &&
+          (fixture.officeGeocodePrecision === "street" || fixture.officeGeocodePrecision === "manual")
+      )
       .filter((fixture) => fixture.areaIds.some((area) => input.areaIds.includes(area)))
       .map((fixture) => ({
         fixture,
@@ -430,7 +494,8 @@ class MemoryMatchRepository implements MatchRepository {
         avatarUrl: candidate.fixture.avatarUrl ?? null,
         coverUrl: candidate.fixture.coverUrl ?? null
       },
-      distanceKm: candidate.distanceKm
+      distanceKm: candidate.distanceKm,
+      distanceReliable: true
     };
   }
 }

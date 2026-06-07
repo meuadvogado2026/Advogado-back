@@ -31,6 +31,7 @@ if (!env.SUPABASE_ANON_KEY) {
 const CLIENT_EMAIL = "usuario@advogado20.com";
 // Coordenada do escritorio fixture em Sao Paulo (Av. Paulista) - seed 001_match_fixtures.
 const SP_FIXTURE = { lat: -23.561414, lng: -46.655881 };
+const EXACT_FIXTURE_TOLERANCE_KM = 0.05;
 const COVERED_SLUGS = new Set(["civil", "consumidor", "trabalhista", "familia"]);
 
 function parseClientCredential(raw: string): { email: string; password: string } {
@@ -91,7 +92,10 @@ if (civil) {
     payload: { ...SP_FIXTURE, accuracyM: 20, areaIds: [civil.id] }
   });
   const body = matched.json() as { status?: string; lawyer?: { id?: string; city?: string }; distanceKm?: number };
-  const matchedOk = matched.statusCode === 200 && body.status === "matched" && (body.distanceKm ?? 99) < 5;
+  const matchedOk =
+    matched.statusCode === 200 &&
+    body.status === "matched" &&
+    (body.distanceKm ?? 99) <= EXACT_FIXTURE_TOLERANCE_KM;
   matchedLawyerId = body.lawyer?.id;
   ok &&= matchedOk;
   steps.push({
@@ -100,6 +104,7 @@ if (civil) {
     status: body.status,
     lawyerCity: body.lawyer?.city ?? null,
     distanceKm: body.distanceKm ?? null,
+    maxExpectedDistanceKm: EXACT_FIXTURE_TOLERANCE_KM,
     ok: matchedOk
   });
 }

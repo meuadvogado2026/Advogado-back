@@ -5,30 +5,20 @@ import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import { apiError } from "../../lib/httpError.js";
 import { createSupabaseAdminClient } from "../../lib/supabase.js";
 import type { LawyerOfficeLocation, Repositories } from "../../repositories/types.js";
-import { GeocodingError, createGeocodingProvider, type Coordinates } from "../geocoding/geocodingService.js";
-
-/** Coordenada elegivel para match: finita e dentro dos limites geograficos. */
-function isValidCoordinate(lat: number | null | undefined, lng: number | null | undefined): boolean {
-  return (
-    typeof lat === "number" &&
-    typeof lng === "number" &&
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180
-  );
-}
+import {
+  GeocodingError,
+  createGeocodingProvider,
+  isOperationalOfficeGeocode,
+  isReliableOfficeGeocode,
+  isValidGeocodeCoordinate,
+  type Coordinates
+} from "../geocoding/geocodingService.js";
 
 export function isMatchEligibleGeocoding(coordinates: Coordinates | null | undefined): boolean {
-  if (!coordinates) return false;
-
-  return (
-    isValidCoordinate(coordinates.lat, coordinates.lng) &&
-    !(coordinates.precision === "cep_centroid" && coordinates.confidence === "low")
-  );
+  return isReliableOfficeGeocode(coordinates);
 }
+
+const isValidCoordinate = isValidGeocodeCoordinate;
 
 export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
@@ -92,7 +82,8 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
    * - address_not_geocoded      -> { kind: "ok", coordinates: null } (recuperavel)
    */
   async function resolveCoordinates(
-    cep: string
+    cep: string,
+    officeNumber?: string
   ): Promise<
     | { kind: "ok"; address: Awaited<ReturnType<typeof geocoding.lookupCep>>; coordinates: Coordinates | null }
     | { kind: "invalid" }
@@ -109,14 +100,60 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
 
     try {
-      const coordinates = await geocoding.geocodeAddress(address);
-      return { kind: "ok", address, coordinates: isMatchEligibleGeocoding(coordinates) ? coordinates : null };
+      const coordinates = await geocoding.geocodeAddress(address, { streetNumber: officeNumber });
+      return { kind: "ok", address, coordinates: isOperationalOfficeGeocode(coordinates) ? coordinates : null };
     } catch (error) {
       if (error instanceof GeocodingError && error.reason === "address_not_geocoded") {
         return { kind: "ok", address, coordinates: null };
       }
       return { kind: "unavailable" };
     }
+  }
+
+  async function resolveAddress(
+    cep: string
+  ): Promise<
+    | { kind: "ok"; address: Awaited<ReturnType<typeof geocoding.lookupCep>> }
+    | { kind: "invalid" }
+    | { kind: "unavailable" }
+  > {
+    try {
+      return { kind: "ok", address: await geocoding.lookupCep(cep) };
+    } catch (error) {
+      if (error instanceof GeocodingError && (error.reason === "invalid_cep" || error.reason === "cep_not_found")) {
+        return { kind: "invalid" };
+      }
+      return { kind: "unavailable" };
+    }
+  }
+
+  function toManualCoordinates(input: { lat: number; lng: number }): Coordinates {
+    return {
+      lat: input.lat,
+      lng: input.lng,
+      provider: "manual",
+      precision: "manual",
+      confidence: "high"
+    };
+  }
+
+  function toOfficeLocation(
+    address: { city: string; state: string } | undefined,
+    coordinates: Coordinates | null
+  ): LawyerOfficeLocation {
+    return {
+      address: address ? { city: address.city, state: address.state } : undefined,
+      coordinates: coordinates ? { lat: coordinates.lat, lng: coordinates.lng } : undefined,
+      clearCoordinates: !coordinates,
+      geocode: coordinates
+        ? {
+            provider: coordinates.provider,
+            precision: coordinates.precision,
+            confidence: coordinates.confidence,
+            geocodedAt: new Date().toISOString()
+          }
+        : undefined
+    };
   }
 
   app.post("/admin/geocode/cep", { preHandler: requireAdmin }, async (request, reply) => {
@@ -132,11 +169,14 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       let recoverable = false;
       let note: string | undefined;
       try {
-        coordinates = await geocoding.geocodeAddress(address);
-        if (!isMatchEligibleGeocoding(coordinates)) {
+        coordinates = await geocoding.geocodeAddress(address, { streetNumber: parsed.data.officeNumber });
+        if (!isOperationalOfficeGeocode(coordinates)) {
           coordinates = null;
           recoverable = true;
           note = "Endereco normalizado, mas a coordenada retornada e ampla demais para calcular distancia confiavel. Ajuste a base de atendimento.";
+        } else if (!isMatchEligibleGeocoding(coordinates)) {
+          recoverable = true;
+          note = "Coordenada aproximada por bairro/CEP. Confirme a localizacao real antes de usar distancia no match.";
         }
       } catch (error) {
         // CEP normalizado, mas coordenada indisponivel: estado recuperavel (sem coordenada falsa).
@@ -193,7 +233,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       return reply.code(422).send(apiError("VALIDATION_ERROR", "Cadastro de advogado invalido.", parsed.error.issues));
     }
 
-    const resolved = await resolveCoordinates(parsed.data.officeCep);
+    const resolved = await resolveCoordinates(parsed.data.officeCep, parsed.data.officeNumber);
     if (resolved.kind === "invalid") {
       return reply.code(422).send(apiError("VALIDATION_ERROR", "CEP invalido ou nao encontrado."));
     }
@@ -202,19 +242,16 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
 
     const { address, coordinates } = resolved;
-    const hasValidCoordinate = isMatchEligibleGeocoding(coordinates);
+    const hasReliableCoordinate = isMatchEligibleGeocoding(coordinates);
 
     // Criterio de aceite (spec 002): advogado aprovado para match deve ter coordenada valida.
-    if (parsed.data.status === "approved" && !hasValidCoordinate) {
+    if (parsed.data.status === "approved" && !hasReliableCoordinate) {
       return reply
         .code(422)
-        .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada valida."));
+        .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada confiavel."));
     }
 
-    const officeLocation: LawyerOfficeLocation = {
-      address: { city: address.city, state: address.state },
-      coordinates: hasValidCoordinate ? { lat: coordinates!.lat, lng: coordinates!.lng } : undefined
-    };
+    const officeLocation = toOfficeLocation(address, coordinates);
     let access: ProvisionedLawyerAccess | null;
     try {
       access = await provisionLawyerAccess({ email: parsed.data.email, name: parsed.data.name });
@@ -242,7 +279,14 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       action: "admin.lawyers.create",
       entityType: "lawyer_profile",
       entityId: lawyer.id,
-      metadata: { persistence: repositories.mode, geocoded: hasValidCoordinate, access: accessResponse(access) }
+      metadata: {
+        persistence: repositories.mode,
+        geocoded: Boolean(coordinates),
+        geocodePrecision: coordinates?.precision ?? null,
+        geocodeConfidence: coordinates?.confidence ?? null,
+        matchEligible: hasReliableCoordinate,
+        access: accessResponse(access)
+      }
     });
 
     return reply.code(201).send({ lawyer, address, coordinates, access: accessResponse(access), persistence: repositories.mode });
@@ -312,17 +356,43 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
 
     // Quando o CEP muda, re-geocodifica para manter a coordenada do escritorio consistente.
-    // Se o admin aprova um legado sem coordenada, tenta recuperar usando o CEP ja salvo.
+    // Se o admin aprova um legado sem coordenada confiavel, tenta recuperar usando o CEP ja salvo.
     let officeLocation: LawyerOfficeLocation | undefined;
     let address: Awaited<ReturnType<typeof geocoding.lookupCep>> | undefined;
+    const manualCoordinates = parsed.data.officeManualLocation ? toManualCoordinates(parsed.data.officeManualLocation) : null;
+    const hasStoredReliableMatchLocation =
+      isValidCoordinate(existing.officeLat, existing.officeLng) &&
+      existing.officeLocationPresent === true &&
+      existing.officeGeocodeConfidence === "high" &&
+      (existing.officeGeocodePrecision === "street" || existing.officeGeocodePrecision === "manual");
     const shouldRecoverMissingCoordinate =
       (parsed.data.status ?? existing.status) === "approved" &&
-      !isValidCoordinate(existing.officeLat, existing.officeLng) &&
+      !manualCoordinates &&
+      !hasStoredReliableMatchLocation &&
       Boolean(existing.officeCep);
-    const cepToResolve = parsed.data.officeCep ?? (shouldRecoverMissingCoordinate ? existing.officeCep : undefined);
+    const cepToResolve = parsed.data.officeCep ?? (!manualCoordinates && shouldRecoverMissingCoordinate ? existing.officeCep : undefined);
+    const officeNumberToResolve = parsed.data.officeNumber ?? existing.officeNumber;
 
-    if (cepToResolve) {
-      const resolved = await resolveCoordinates(cepToResolve);
+    if (manualCoordinates) {
+      const cepForAddress = parsed.data.officeCep;
+      if (cepForAddress) {
+        const resolved = await resolveAddress(cepForAddress);
+        if (resolved.kind === "invalid") {
+          return reply.code(422).send(apiError("VALIDATION_ERROR", "CEP invalido ou nao encontrado."));
+        }
+        if (resolved.kind === "unavailable") {
+          return reply.code(502).send(apiError("UPSTREAM_ERROR", "Falha ao consultar CEP."));
+        }
+        address = resolved.address;
+      }
+      const addressForLocation = address
+        ? { city: address.city, state: address.state }
+        : existing.officeCity && existing.officeState
+          ? { city: existing.officeCity, state: existing.officeState }
+          : undefined;
+      officeLocation = toOfficeLocation(addressForLocation, manualCoordinates);
+    } else if (cepToResolve) {
+      const resolved = await resolveCoordinates(cepToResolve, officeNumberToResolve);
       if (resolved.kind === "invalid") {
         return reply.code(422).send(apiError("VALIDATION_ERROR", "CEP invalido ou nao encontrado."));
       }
@@ -330,23 +400,26 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
         return reply.code(502).send(apiError("UPSTREAM_ERROR", "Falha ao geocodificar CEP."));
       }
       address = resolved.address;
-      const eligibleCoordinates = isMatchEligibleGeocoding(resolved.coordinates) ? resolved.coordinates : null;
-      officeLocation = {
-        address: { city: resolved.address.city, state: resolved.address.state },
-        coordinates: eligibleCoordinates ? { lat: eligibleCoordinates.lat, lng: eligibleCoordinates.lng } : undefined
-      };
+      officeLocation = toOfficeLocation({ city: resolved.address.city, state: resolved.address.state }, resolved.coordinates);
     }
 
-    // Coordenada resultante apos o patch: a recem-geocodificada ou a ja persistida.
+    // Localizacao resultante apos o patch: a recem-geocodificada ou a ja persistida.
     const resultingLat = officeLocation?.coordinates?.lat ?? existing.officeLat;
     const resultingLng = officeLocation?.coordinates?.lng ?? existing.officeLng;
+    const resultingHasReliableMatchLocation = officeLocation
+      ? Boolean(
+          officeLocation.geocode &&
+            officeLocation.geocode.confidence === "high" &&
+            (officeLocation.geocode.precision === "street" || officeLocation.geocode.precision === "manual")
+        )
+      : hasStoredReliableMatchLocation;
     const targetStatus = parsed.data.status ?? existing.status;
 
-    // Criterio de aceite (spec 002): nao permitir aprovar sem coordenada valida.
-    if (targetStatus === "approved" && !isValidCoordinate(resultingLat, resultingLng)) {
+    // Criterio de aceite: aprovacao para match exige coordenada confiavel, nao centroide aproximado.
+    if (targetStatus === "approved" && (!isValidCoordinate(resultingLat, resultingLng) || !resultingHasReliableMatchLocation)) {
       return reply
         .code(422)
-        .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada valida."));
+        .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada confiavel."));
     }
 
     const lawyer = await repositories.lawyers.update(id, parsed.data, officeLocation);
@@ -359,7 +432,11 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       action: "admin.lawyers.update",
       entityType: "lawyer_profile",
       entityId: lawyer.id,
-      metadata: { persistence: repositories.mode, regeocoded: Boolean(officeLocation?.coordinates) }
+      metadata: {
+        persistence: repositories.mode,
+        locationUpdate: officeLocation?.geocode?.precision ?? null,
+        matchEligible: lawyer.officeLocationStatus === "validated"
+      }
     });
 
     return { lawyer, address };

@@ -46,12 +46,19 @@ export const lawyerCreateSchema = z.object({
   status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).default("draft")
 });
 
+const officeManualLocationSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180)
+});
+
 export const lawyerPatchSchema = lawyerCreateSchema.partial().extend({
-  status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).optional()
+  status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).optional(),
+  officeManualLocation: officeManualLocationSchema.optional()
 });
 
 export const geocodeCepSchema = z.object({
-  cep: z.string().regex(/^\d{5}-?\d{3}$/)
+  cep: z.string().regex(/^\d{5}-?\d{3}$/),
+  officeNumber: z.string().trim().min(1).optional()
 });
 
 export const prayerRequestSchema = z.object({

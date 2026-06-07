@@ -95,8 +95,41 @@ describe("foundation API", () => {
     expect(body.lawyer.avatarUrl).toBe("https://example.test/ana-avatar.jpg");
     expect(body.lawyer.coverUrl).toBe("https://example.test/ana-cover.jpg");
     expect(typeof body.distanceKm).toBe("number");
+    expect(body.distanceReliable).toBe(true);
     // Nao deve vazar PII interna (CEP/endereco completo).
     expect(body.lawyer.officeCep).toBeUndefined();
+  });
+
+  it("does not expose numeric distance when a repository marks it as unreliable", async () => {
+    const repos = createMemoryRepositories();
+    repos.matches.findNearest = async () => ({
+      lawyer: {
+        id: "lawyer-approx",
+        name: "Dr. Aproximado",
+        whatsapp: "11900000000",
+        city: "Brasilia",
+        state: "DF",
+        areaIds: ["civil"]
+      },
+      distanceKm: 4.096,
+      distanceReliable: false,
+      distanceNotice: "Localizacao do advogado em confirmacao."
+    });
+    const app = await buildApp(repos);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/match",
+      headers: CLIENT,
+      payload: { lat: -15.87, lng: -48.07, accuracyM: 100, areaIds: ["civil"] }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.status).toBe("matched");
+    expect(body.distanceKm).toBeUndefined();
+    expect(body.distanceReliable).toBe(false);
+    expect(body.distanceNotice).toContain("confirmacao");
   });
 
   it("keeps match response available when event recording fails", async () => {
@@ -529,6 +562,34 @@ describe("foundation API", () => {
     expect(typeof body.lawyer.officeLat).toBe("number");
     expect(typeof body.lawyer.officeLng).toBe("number");
     expect(typeof body.coordinates.lat).toBe("number");
+    expect(body.lawyer.officeGeocodePrecision).toBe("street");
+    expect(body.lawyer.officeGeocodeConfidence).toBe("high");
+    expect(body.lawyer.officeLocationStatus).toBe("validated");
+  });
+
+  it("lets admin confirm a lawyer office location manually before approval", async () => {
+    const repos = createMemoryRepositories();
+    const draft = await repos.lawyers.create(draftWithoutCoordinate({ email: "manual-location@example.test" }));
+
+    const app = await buildApp(repos);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/lawyers/${draft.id}`,
+      headers: ADMIN,
+      payload: {
+        status: "approved",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 }
+      }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.lawyer.status).toBe("approved");
+    expect(body.lawyer.officeGeocodeProvider).toBe("manual");
+    expect(body.lawyer.officeGeocodePrecision).toBe("manual");
+    expect(body.lawyer.officeGeocodeConfidence).toBe("high");
+    expect(body.lawyer.officeLocationStatus).toBe("validated");
   });
 
   it("blocks approving a lawyer when the stored CEP cannot recover a valid coordinate", async () => {
@@ -593,6 +654,38 @@ describe("foundation API", () => {
     expect(body.lawyer.officeState).toBeTruthy();
     expect(typeof body.lawyer.officeLat).toBe("number");
     expect(typeof body.lawyer.officeLng).toBe("number");
+  });
+
+  it("recovers the PostGIS match location when a legacy lawyer has coordinates but no geography", async () => {
+    const repos = createMemoryRepositories();
+    const draft = await repos.lawyers.create(
+      draftWithoutCoordinate({ email: "approve-legacy-geography@example.test" })
+    );
+    const originalGetById = repos.lawyers.getById.bind(repos.lawyers);
+    repos.lawyers.getById = async (id: string) => {
+      const lawyer = await originalGetById(id);
+      if (id !== draft.id || !lawyer) return lawyer;
+      return {
+        ...lawyer,
+        officeLat: -23.55052,
+        officeLng: -46.633308,
+        officeLocationPresent: false
+      };
+    };
+
+    const app = await buildApp(repos);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/lawyers/${draft.id}`,
+      headers: ADMIN,
+      payload: { status: "approved" }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.lawyer.status).toBe("approved");
+    expect(body.lawyer.officeLocationPresent).toBe(true);
   });
 
   it("lets admin edit lawyer operational data and persist location from CEP", async () => {

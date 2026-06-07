@@ -1,4 +1,5 @@
 import type { AdminImageUpload, AdminLawyerImageUpload, AdminPartnerLogoCreate, LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
+import type { GeocodeConfidence, GeocodePrecision, GeocodeProviderName } from "../modules/geocoding/geocodingService.js";
 import type { Role } from "../auth/types.js";
 
 export type Profile = {
@@ -54,6 +55,12 @@ export type LawyerRecord = LawyerCreate & {
   profileId: string;
   officeLat?: number | null;
   officeLng?: number | null;
+  officeLocationPresent?: boolean;
+  officeGeocodeProvider?: GeocodeProviderName | null;
+  officeGeocodePrecision?: GeocodePrecision | null;
+  officeGeocodeConfidence?: GeocodeConfidence | null;
+  officeGeocodedAt?: string | null;
+  officeLocationStatus?: "validated" | "needs_confirmation" | "pending";
   officeCity?: string | null;
   officeState?: string | null;
   mustChangePassword?: boolean;
@@ -74,6 +81,13 @@ export type LawyerOfficeAddress = {
 export type LawyerOfficeLocation = {
   address?: LawyerOfficeAddress;
   coordinates?: LawyerCoordinates;
+  clearCoordinates?: boolean;
+  geocode?: {
+    provider: GeocodeProviderName;
+    precision: GeocodePrecision;
+    confidence: GeocodeConfidence;
+    geocodedAt?: string;
+  };
 };
 
 export interface ProfileRepository {
@@ -252,6 +266,8 @@ export type MatchedLawyer = {
 export type NearestLawyerResult = {
   lawyer: MatchedLawyer;
   distanceKm: number;
+  distanceReliable?: boolean;
+  distanceNotice?: string;
 } | null;
 
 export interface MatchRepository {

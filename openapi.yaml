@@ -88,7 +88,7 @@ paths:
   /v1/match:
     post:
       summary: Solicita match por localizacao e areas juridicas
-      description: Retorna o advogado aprovado mais proximo e compativel via PostGIS.
+      description: Retorna o advogado aprovado mais proximo e compativel via PostGIS. Distancia numerica so deve ser exibida quando distanceReliable for true.
       security:
         - bearerAuth: []
       requestBody:
@@ -149,6 +149,13 @@ paths:
                             format: uri
                   distanceKm:
                     type: number
+                    description: Distancia em km apenas quando a coordenada do advogado e confiavel.
+                  distanceReliable:
+                    type: boolean
+                    description: Indica se distanceKm pode ser exibida como distancia real.
+                  distanceNotice:
+                    type: string
+                    description: Aviso operacional quando a localizacao do advogado estiver em confirmacao.
                   algorithmVersion:
                     type: string
         "401":
@@ -260,6 +267,35 @@ paths:
           description: Role insuficiente
         "422":
           description: Payload invalido
+  /v1/admin/geocode/cep:
+    post:
+      summary: Consulta CEP pelo backend e retorna estado de geocoding seguro
+      description: Retorna endereco normalizado e coordenada operacional quando disponivel. Coordenada aproximada exige confirmacao manual antes de distancia exata.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cep]
+              properties:
+                cep:
+                  type: string
+                officeNumber:
+                  type: string
+      responses:
+        "200":
+          description: CEP normalizado, com coordenada validada, aproximada ou pendente
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
+        "422":
+          description: CEP invalido ou nao encontrado
+        "503":
+          description: Provider de geocoding indisponivel
   /v1/admin/lawyers/{id}/access-invite:
     post:
       summary: Ativa convite de primeiro acesso para advogado legado
@@ -331,6 +367,7 @@ paths:
   /v1/admin/lawyers/{id}:
     patch:
       summary: Atualiza advogado por id
+      description: Admin pode confirmar localizacao manual com officeManualLocation. Coordenadas aproximadas nao tornam o advogado elegivel para distancia exata.
       security:
         - bearerAuth: []
       parameters:
@@ -339,6 +376,28 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [draft, pending_review, approved, rejected, suspended]
+                officeCep:
+                  type: string
+                officeNumber:
+                  type: string
+                officeManualLocation:
+                  type: object
+                  required: [lat, lng]
+                  properties:
+                    lat:
+                      type: number
+                    lng:
+                      type: number
       responses:
         "200":
           description: Advogado atualizado

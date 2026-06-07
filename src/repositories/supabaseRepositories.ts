@@ -258,7 +258,7 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 // Inclui office_lat/office_lng para refletir a coordenada persistida no escritorio.
 const LAWYER_COLUMNS =
-  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_cep, office_number, office_city, office_state, office_lat, office_lng, created_at, updated_at";
+  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_cep, office_number, office_city, office_state, office_lat, office_lng, office_location, office_geocode_provider, office_geocode_precision, office_geocode_confidence, office_geocoded_at, created_at, updated_at";
 
 type LawyerRow = {
   id: string;
@@ -279,6 +279,11 @@ type LawyerRow = {
   office_state: string | null;
   office_lat: number | string | null;
   office_lng: number | string | null;
+  office_location: unknown | null;
+  office_geocode_provider: LawyerRecord["officeGeocodeProvider"];
+  office_geocode_precision: LawyerRecord["officeGeocodePrecision"];
+  office_geocode_confidence: LawyerRecord["officeGeocodeConfidence"];
+  office_geocoded_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -302,6 +307,25 @@ type LawyerSpecialtyRow = {
 
 const toCoord = (value: number | string | null): number | null =>
   value === null ? null : Number(value);
+
+function officeLocationStatus(row: LawyerRow): LawyerRecord["officeLocationStatus"] {
+  const lat = toCoord(row.office_lat);
+  const lng = toCoord(row.office_lng);
+  const hasCoordinate =
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    row.office_location !== null;
+  if (!hasCoordinate) return "pending";
+  if (
+    row.office_geocode_confidence === "high" &&
+    (row.office_geocode_precision === "street" || row.office_geocode_precision === "manual")
+  ) {
+    return "validated";
+  }
+  return "needs_confirmation";
+}
 
 /**
  * Monta a geografia 4326 a partir de lng/lat no formato EWKT aceito pelo
@@ -341,6 +365,12 @@ class SupabaseLawyerRepository implements LawyerRepository {
       status: row.status,
       officeLat: toCoord(row.office_lat),
       officeLng: toCoord(row.office_lng),
+      officeLocationPresent: row.office_location !== null,
+      officeGeocodeProvider: row.office_geocode_provider,
+      officeGeocodePrecision: row.office_geocode_precision,
+      officeGeocodeConfidence: row.office_geocode_confidence,
+      officeGeocodedAt: row.office_geocoded_at,
+      officeLocationStatus: officeLocationStatus(row),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       ...overrides
@@ -447,6 +477,12 @@ class SupabaseLawyerRepository implements LawyerRepository {
       insertPayload.office_lng = location.coordinates.lng;
       insertPayload.office_location = toOfficeLocation(location.coordinates);
     }
+    if (location?.geocode) {
+      insertPayload.office_geocode_provider = location.geocode.provider;
+      insertPayload.office_geocode_precision = location.geocode.precision;
+      insertPayload.office_geocode_confidence = location.geocode.confidence;
+      insertPayload.office_geocoded_at = location.geocode.geocodedAt ?? new Date().toISOString();
+    }
 
     const { data, error } = await this.supabase
       .from("lawyer_profiles")
@@ -524,6 +560,20 @@ class SupabaseLawyerRepository implements LawyerRepository {
       updatePayload.office_lat = location.coordinates.lat;
       updatePayload.office_lng = location.coordinates.lng;
       updatePayload.office_location = toOfficeLocation(location.coordinates);
+    } else if (location?.clearCoordinates) {
+      updatePayload.office_lat = null;
+      updatePayload.office_lng = null;
+      updatePayload.office_location = null;
+      updatePayload.office_geocode_provider = null;
+      updatePayload.office_geocode_precision = null;
+      updatePayload.office_geocode_confidence = null;
+      updatePayload.office_geocoded_at = null;
+    }
+    if (location?.geocode) {
+      updatePayload.office_geocode_provider = location.geocode.provider;
+      updatePayload.office_geocode_precision = location.geocode.precision;
+      updatePayload.office_geocode_confidence = location.geocode.confidence;
+      updatePayload.office_geocoded_at = location.geocode.geocodedAt ?? new Date().toISOString();
     }
 
     const { data, error } = await this.supabase
@@ -711,7 +761,8 @@ class SupabaseMatchRepository implements MatchRepository {
         avatarUrl: profile?.avatar_url ?? null,
         coverUrl: profile?.cover_url ?? null
       },
-      distanceKm: Number(row.distance_km)
+      distanceKm: Number(row.distance_km),
+      distanceReliable: true
     };
   }
 }

@@ -33,6 +33,7 @@ const ADMIN_EMAIL = "admin@advogado20.com";
 const CLIENT_EMAIL = "usuario@advogado20.com";
 const LAWYER_EMAIL = "advogado@advogado20.com";
 const SP_FIXTURE = { lat: -23.561414, lng: -46.655881 };
+const EXACT_FIXTURE_TOLERANCE_KM = 0.05;
 const COVERED = new Set(["civil", "consumidor", "trabalhista", "familia"]);
 const PUBLIC_PROFILE_KEYS = new Set([
   "id",
@@ -111,7 +112,17 @@ if (civil) {
   const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [civil.id] }) });
   const b = m.body as { status?: string; lawyer?: { id?: string; city?: string }; distanceKm?: number };
   matchedLawyerId = b?.lawyer?.id;
-  mark({ step: "POST /v1/match SP/civil", status: m.status, matchStatus: b?.status, city: b?.lawyer?.city, distanceKm: b?.distanceKm }, m.status === 200 && b?.status === "matched");
+  mark(
+    {
+      step: "POST /v1/match SP/civil",
+      status: m.status,
+      matchStatus: b?.status,
+      city: b?.lawyer?.city,
+      distanceKm: b?.distanceKm,
+      maxExpectedDistanceKm: EXACT_FIXTURE_TOLERANCE_KM
+    },
+    m.status === 200 && b?.status === "matched" && (b?.distanceKm ?? 99) <= EXACT_FIXTURE_TOLERANCE_KM
+  );
 }
 
 // lawyer profile no token

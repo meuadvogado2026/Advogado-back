@@ -43,7 +43,7 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
         lng,
         accuracyM,
         specialtyIds: areaIds,
-        distanceKm: nearest?.distanceKm,
+        distanceKm: nearest?.distanceReliable === false ? undefined : nearest?.distanceKm,
         algorithmVersion: ALGORITHM_VERSION
       });
     } catch (error) {
@@ -64,7 +64,9 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
     return reply.code(200).send({
       status: "matched",
       lawyer: nearest.lawyer,
-      distanceKm: nearest.distanceKm,
+      ...(nearest.distanceReliable === false ? {} : { distanceKm: nearest.distanceKm }),
+      distanceReliable: nearest.distanceReliable !== false,
+      ...(nearest.distanceNotice ? { distanceNotice: nearest.distanceNotice } : {}),
       algorithmVersion: ALGORITHM_VERSION
     });
   });

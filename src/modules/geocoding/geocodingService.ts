@@ -8,17 +8,48 @@ export type CepAddress = {
   state: string;
 };
 
+export type GeocodeProviderName = "stub" | "nominatim" | "manual";
+export type GeocodePrecision = "cep_centroid" | "street" | "manual";
+export type GeocodeConfidence = "high" | "medium" | "low";
+
 export type Coordinates = {
   lat: number;
   lng: number;
-  provider: "stub" | "nominatim";
-  precision: "cep_centroid" | "street" | "manual";
-  confidence: "high" | "medium" | "low";
+  provider: GeocodeProviderName;
+  precision: GeocodePrecision;
+  confidence: GeocodeConfidence;
 };
+
+export function isValidGeocodeCoordinate(lat: number | null | undefined, lng: number | null | undefined): boolean {
+  return (
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
+export function isReliableOfficeGeocode(coordinates: Coordinates | null | undefined): boolean {
+  if (!coordinates) return false;
+  return (
+    isValidGeocodeCoordinate(coordinates.lat, coordinates.lng) &&
+    coordinates.confidence === "high" &&
+    (coordinates.precision === "street" || coordinates.precision === "manual")
+  );
+}
+
+export function isOperationalOfficeGeocode(coordinates: Coordinates | null | undefined): boolean {
+  if (!coordinates) return false;
+  return isValidGeocodeCoordinate(coordinates.lat, coordinates.lng) && coordinates.confidence !== "low";
+}
 
 export interface GeocodingProvider {
   lookupCep(cep: string): Promise<CepAddress>;
-  geocodeAddress(address: CepAddress): Promise<Coordinates>;
+  geocodeAddress(address: CepAddress, options?: { streetNumber?: string }): Promise<Coordinates>;
 }
 
 /**
@@ -123,8 +154,8 @@ export class StubGeocodingProvider implements GeocodingProvider {
       lat: -23.55052,
       lng: -46.633308,
       provider: "stub",
-      precision: "cep_centroid",
-      confidence: "medium"
+      precision: "street",
+      confidence: "high"
     };
     stubCoordinateCache.set(cacheKey, coordinates);
     return coordinates;
@@ -181,6 +212,13 @@ function nominatimQueryPart(value: string): string {
     .replace(/\s*\([^)]*\)\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function nominatimStreetWithNumber(street: string, streetNumber?: string): string {
+  const normalizedStreet = nominatimQueryPart(street);
+  const normalizedNumber = streetNumber?.trim();
+  if (!normalizedStreet || !normalizedNumber) return normalizedStreet;
+  return `${normalizedStreet}, ${normalizedNumber}`;
 }
 
 export class NominatimGeocodingProvider implements GeocodingProvider {
@@ -248,13 +286,14 @@ export class NominatimGeocodingProvider implements GeocodingProvider {
     return address;
   }
 
-  async geocodeAddress(address: CepAddress): Promise<Coordinates> {
-    const cacheKey = `${address.cep}:${address.street}:${address.city}:${address.state}`;
+  async geocodeAddress(address: CepAddress, options: { streetNumber?: string } = {}): Promise<Coordinates> {
+    const streetNumber = options.streetNumber?.trim();
+    const cacheKey = `${address.cep}:${address.street}:${streetNumber ?? ""}:${address.city}:${address.state}`;
     const cached = this.coordCache.get(cacheKey);
     if (cached) return cached;
 
     const queries: Array<{ query: string; precision: Coordinates["precision"] }> = [];
-    const streetQuery = [address.street, address.neighborhood, address.city, address.state, "Brasil"]
+    const streetQuery = [nominatimStreetWithNumber(address.street, streetNumber), address.neighborhood, address.city, address.state, "Brasil"]
       .map(nominatimQueryPart)
       .filter((part) => part.length > 0)
       .join(", ");

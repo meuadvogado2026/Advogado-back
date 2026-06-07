@@ -98,6 +98,18 @@ describe("NominatimGeocodingProvider.geocodeAddress", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("includes the office number in the street-level geocoding query when provided", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse([{ lat: "-23.55052", lon: "-46.633308", addresstype: "house_number" }]));
+    const provider = buildProvider(fetchImpl as unknown as typeof fetch);
+
+    await provider.geocodeAddress(address, { streetNumber: "200" });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0]?.[0]).toContain("Praca%20da%20Se%2C%20200");
+  });
+
   it("falls back to city and state centroid when the full address has no results", async () => {
     const fetchImpl = vi
       .fn()
@@ -180,6 +192,18 @@ describe("admin lawyer geocoding eligibility", () => {
     ).toBe(false);
   });
 
+  it("does not treat medium-confidence CEP centroid as exact distance", () => {
+    expect(
+      isMatchEligibleGeocoding({
+        lat: -15.87,
+        lng: -48.07,
+        provider: "nominatim",
+        precision: "cep_centroid",
+        confidence: "medium"
+      })
+    ).toBe(false);
+  });
+
   it("keeps street-level coordinates eligible for match", () => {
     expect(
       isMatchEligibleGeocoding({
@@ -187,6 +211,18 @@ describe("admin lawyer geocoding eligibility", () => {
         lng: -46.63,
         provider: "nominatim",
         precision: "street",
+        confidence: "high"
+      })
+    ).toBe(true);
+  });
+
+  it("keeps manually confirmed coordinates eligible for match", () => {
+    expect(
+      isMatchEligibleGeocoding({
+        lat: -23.55,
+        lng: -46.63,
+        provider: "manual",
+        precision: "manual",
         confidence: "high"
       })
     ).toBe(true);
