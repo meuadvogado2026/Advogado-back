@@ -7,6 +7,7 @@ import { registerAdminOperationRoutes } from "./modules/adminOperations/routes.j
 import { registerAreaRoutes } from "./modules/areas/routes.js";
 import { registerAuthRoutes } from "./modules/auth/routes.js";
 import { registerHealthRoutes } from "./modules/health/routes.js";
+import { registerGeographyRoutes } from "./modules/geography/routes.js";
 import { registerLawyerProfileRoutes } from "./modules/lawyerProfiles/routes.js";
 import { registerMatchRoutes } from "./modules/match/routes.js";
 import { registerSpec008Routes } from "./modules/spec008/routes.js";
@@ -33,6 +34,7 @@ export async function buildApp(repositoriesOverride?: Repositories) {
 
   await app.register(async (v1) => {
     await registerAreaRoutes(v1, repositories.legalSpecialties);
+    await registerGeographyRoutes(v1, env, repositories);
     await registerAuthRoutes(v1, env, repositories);
     await registerMatchRoutes(v1, env, repositories);
     await registerLawyerProfileRoutes(v1, env, repositories);

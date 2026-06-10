@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
-import { matchRequestSchema } from "../../contracts/api.js";
+import { cityMatchRequestSchema, matchRequestSchema } from "../../contracts/api.js";
 import { apiError } from "../../lib/httpError.js";
 import type { Repositories } from "../../repositories/types.js";
 
@@ -69,5 +69,26 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
       ...(nearest.distanceNotice ? { distanceNotice: nearest.distanceNotice } : {}),
       algorithmVersion: ALGORITHM_VERSION
     });
+  });
+
+  app.post("/match/by-city", { preHandler: requireClient }, async (request, reply) => {
+    const parsed = cityMatchRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(422).send(apiError("VALIDATION_ERROR", "Payload de busca por cidade invalido.", parsed.error.issues));
+    const city = await repositories.geographies.getCity(parsed.data.cityId);
+    const state = await repositories.geographies.getState(parsed.data.stateId);
+    if (!city?.active || !state?.active || city.stateId !== state.id) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Estado ou cidade invalido."));
+    }
+    if (repositories.mode === "supabase" && parsed.data.areaIds.some((areaId) => !isSupabaseAreaId(areaId))) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Payload de busca por cidade invalido."));
+    }
+    const result = await repositories.matches.findByCity(parsed.data);
+    const totalPages = Math.ceil(result.total / parsed.data.pageSize);
+    return {
+      status: result.total > 0 ? "matched" : "empty",
+      lawyers: result.lawyers,
+      pagination: { page: parsed.data.page, pageSize: parsed.data.pageSize, total: result.total, totalPages },
+      algorithmVersion: "city-nearest-v1"
+    };
   });
 }

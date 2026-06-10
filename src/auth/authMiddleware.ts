@@ -52,6 +52,7 @@ export function createAuthPreHandler(env: AppEnv, repositories: Repositories, al
 
       request.currentUser = {
         id: profile.id,
+        name: profile.name,
         email: profile.email,
         role: profile.role,
         mustChangePassword: profile.mustChangePassword ?? false,

@@ -3,6 +3,13 @@
 **Banco:** Supabase Postgres novo  
 **Estado:** migrations versionadas / spec 007 LGPD implementada com ressalvas
 
+## Spec 012
+
+- `states` e `cities`, com centroide PostGIS e `unique(state_id, normalized_name)`.
+- `lawyer_profiles.service_city_id` nullable e FK `on delete restrict`.
+- `lawyer_profiles.available_for_matches` default `true`, aplicado aos dois matches.
+- Migration aditiva: `src/db/migrations/0011_geographic_catalog_city_match.sql`.
+
 ## Extensoes Recomendadas
 
 - `uuid-ossp` ou `pgcrypto`.

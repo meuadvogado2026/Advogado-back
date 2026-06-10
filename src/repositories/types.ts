@@ -1,4 +1,4 @@
-import type { AdminImageUpload, AdminLawyerImageUpload, AdminPartnerLogoCreate, LawyerCreate, LawyerPatch, PrayerRequest } from "../contracts/api.js";
+import type { AdminImageUpload, AdminLawyerImageUpload, AdminPartnerLogoCreate, CityCreate, CityPatch, LawyerCreate, LawyerPatch, PrayerRequest, StateCreate, StatePatch } from "../contracts/api.js";
 import type { GeocodeConfidence, GeocodePrecision, GeocodeProviderName } from "../modules/geocoding/geocodingService.js";
 import type { Role } from "../auth/types.js";
 
@@ -63,12 +63,40 @@ export type LawyerRecord = LawyerCreate & {
   officeLocationStatus?: "validated" | "needs_confirmation" | "pending";
   officeCity?: string | null;
   officeState?: string | null;
+  serviceStateId?: string | null;
+  serviceStateCode?: string | null;
+  serviceCityName?: string | null;
   mustChangePassword?: boolean;
   accessInvitedAt?: string | null;
   firstLoginCompletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+export type StateRecord = StateCreate & { id: string; createdAt: string; updatedAt: string };
+export type CityRecord = {
+  id: string;
+  stateId: string;
+  stateCode: string;
+  name: string;
+  active: boolean;
+  center: LawyerCoordinates;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export interface GeographyRepository {
+  listStates(activeOnly?: boolean): Promise<StateRecord[]>;
+  getState(id: string): Promise<StateRecord | null>;
+  createState(input: StateCreate): Promise<StateRecord>;
+  updateState(id: string, patch: StatePatch): Promise<StateRecord | null>;
+  deleteState(id: string): Promise<"deleted" | "linked" | "not_found">;
+  listCities(stateId?: string, activeOnly?: boolean): Promise<CityRecord[]>;
+  getCity(id: string): Promise<CityRecord | null>;
+  createCity(input: CityCreate): Promise<CityRecord>;
+  updateCity(id: string, patch: CityPatch): Promise<CityRecord | null>;
+  deleteCity(id: string): Promise<"deleted" | "linked" | "not_found">;
+}
 
 /** Coordenada geocodificada persistida no escritorio do advogado (office_location). */
 export type LawyerCoordinates = { lat: number; lng: number };
@@ -272,6 +300,10 @@ export type NearestLawyerResult = {
 
 export interface MatchRepository {
   findNearest(input: NearestLawyerInput): Promise<NearestLawyerResult>;
+  findByCity(input: { stateId: string; cityId: string; areaIds: string[]; page: number; pageSize: 5 }): Promise<{
+    lawyers: Array<MatchedLawyer & { distanceFromCityCenterKm: number }>;
+    total: number;
+  }>;
 }
 
 export type MatchEventInput = {
@@ -292,6 +324,7 @@ export interface MatchEventRepository {
 export type Repositories = {
   profiles: ProfileRepository;
   legalSpecialties: LegalSpecialtyRepository;
+  geographies: GeographyRepository;
   lawyers: LawyerRepository;
   publicLawyerProfiles: PublicLawyerProfileRepository;
   lawyerDashboards: LawyerDashboardRepository;

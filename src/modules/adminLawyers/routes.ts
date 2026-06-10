@@ -233,6 +233,12 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       return reply.code(422).send(apiError("VALIDATION_ERROR", "Cadastro de advogado invalido.", parsed.error.issues));
     }
 
+    const serviceCity = await repositories.geographies.getCity(parsed.data.serviceCityId);
+    const serviceState = await repositories.geographies.getState(parsed.data.serviceStateId);
+    if (!serviceCity?.active || !serviceState?.active || serviceCity.stateId !== serviceState.id) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Estado e cidade de atendimento invalidos."));
+    }
+
     const resolved = await resolveCoordinates(parsed.data.officeCep, parsed.data.officeNumber);
     if (resolved.kind === "invalid") {
       return reply.code(422).send(apiError("VALIDATION_ERROR", "CEP invalido ou nao encontrado."));
@@ -241,16 +247,9 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       return reply.code(502).send(apiError("UPSTREAM_ERROR", "Falha ao geocodificar CEP."));
     }
 
-    const { address, coordinates } = resolved;
+    const { address } = resolved;
+    const coordinates = toManualCoordinates(parsed.data.officeManualLocation);
     const hasReliableCoordinate = isMatchEligibleGeocoding(coordinates);
-
-    // Criterio de aceite (spec 002): advogado aprovado para match deve ter coordenada valida.
-    if (parsed.data.status === "approved" && !hasReliableCoordinate) {
-      return reply
-        .code(422)
-        .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada confiavel."));
-    }
-
     const officeLocation = toOfficeLocation(address, coordinates);
     let access: ProvisionedLawyerAccess | null;
     try {
@@ -264,7 +263,8 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
 
     let lawyer;
     try {
-      lawyer = await repositories.lawyers.create(parsed.data, officeLocation, {
+      const { officeManualLocation: _manual, serviceStateId: _state, ...lawyerInput } = parsed.data;
+      lawyer = await repositories.lawyers.create(lawyerInput, officeLocation, {
         profileId: access.profileId,
         accessInvitedAt: access.accessInvitedAt,
         mustChangePassword: false
@@ -298,7 +298,6 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     if (!existing) {
       return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
     }
-
     const profile = await repositories.profiles.getById(existing.profileId);
     if (!profile) {
       return reply.code(404).send(apiError("NOT_FOUND", "Perfil do advogado nao encontrado."));
@@ -353,6 +352,14 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     const existing = await repositories.lawyers.getById(id);
     if (!existing) {
       return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
+    }
+    const targetCityId = parsed.data.serviceCityId ?? existing.serviceCityId;
+    if (!targetCityId) return reply.code(422).send(apiError("VALIDATION_ERROR", "Estado e cidade de atendimento sao obrigatorios."));
+    const serviceCity = await repositories.geographies.getCity(targetCityId);
+    const targetStateId = parsed.data.serviceStateId ?? serviceCity?.stateId;
+    const serviceState = targetStateId ? await repositories.geographies.getState(targetStateId) : null;
+    if (!serviceCity?.active || !serviceState?.active || serviceCity.stateId !== serviceState.id) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Estado e cidade de atendimento invalidos."));
     }
 
     // Quando o CEP muda, re-geocodifica para manter a coordenada do escritorio consistente.
@@ -422,7 +429,8 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
         .send(apiError("VALIDATION_ERROR", "Advogado aprovado para match deve ter coordenada confiavel."));
     }
 
-    const lawyer = await repositories.lawyers.update(id, parsed.data, officeLocation);
+    const { serviceStateId: _serviceStateId, ...lawyerPatch } = parsed.data;
+    const lawyer = await repositories.lawyers.update(id, lawyerPatch, officeLocation);
     if (!lawyer) {
       return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
     }

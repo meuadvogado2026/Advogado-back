@@ -1,9 +1,19 @@
 # Backend Status - Meu Advogado 2.0
 
-**Ultima atualizacao:** 2026-06-05
-**Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO / SPEC010 PUBLICADA
-**Veredito:** BACKEND_GEO_BAIRRO_CEP_LOCAL_OK / GEO_MATCH_CENTROIDE_BAIXA_CONFIANCA_PUBLICADO_OK / SPEC010_BACKEND_PUBLICADO_OK / PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+## Spec 012 - 2026-06-10
 
+Migration `0011`, catalogo, repositories, vinculo/disponibilidade e
+`POST /v1/match/by-city` implementados. Harness passou com 82 testes. Migration remota,
+plano real da query e smoke autenticado permanecem pendentes.
+
+**Ultima atualizacao:** 2026-06-10
+**Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO / SPEC010 PUBLICADA
+**Veredito:** SPEC011_ME_NAME_LOCAL_OK / BACKEND_GEO_BAIRRO_CEP_LOCAL_OK / GEO_MATCH_CENTROIDE_BAIXA_CONFIANCA_PUBLICADO_OK / SPEC010_BACKEND_PUBLICADO_OK / PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK / MIGRATION_0006_APLICADA_OK / MIGRATION_0005_APLICADA_OK / ADMIN_OPERACIONAL_ORACOES_USUARIOS_MIDIA_PRODUCAO_OK / MIGRATION_0004_APLICADA_OK / CLIENT_SIGNUP_PRODUCAO_OK / CLIENT_SIGNUP_BACKEND_LOCAL_OK / MATCH_EVENTO_NAO_BLOQUEIA_RESPOSTA_LOCAL_OK / SPEC008_PARTE3_RETENCAO_ORACAO_PUBLICADA_OK
+
+- [x] Nomes do catalogo juridico normalizados em portugues em 2026-06-10: `Direito de Família`, `Direito Previdenciário` e `Direito Tributário`. A migration pendente `0010` agora atualiza idempotentemente os nomes das 8 areas existentes, alem de adicionar as duas novas.
+- [x] Catalogo juridico ampliado localmente em 2026-06-10 para 8 areas com `Direito Empresarial` e `Direito Tributario`. O modo memory, a foundation e a migration aditiva idempotente `0010_add_empresarial_tributario_specialties.sql` foram atualizados; `/v1/areas` e testes garantem as 8 opcoes usadas por mobile/admin. Gates: `npm run typecheck`, `tests/app.test.ts` 54 testes, `npm run migration:check` e `npm run harness` 79 testes exit 0. Migration `0010` ainda nao aplicada remotamente.
+- [x] Spec 011 backend local OK em 2026-06-10: `GET /v1/me` e `POST /v1/auth/change-password` passam a retornar `user.name` a partir de `profiles.name`, sem migration e sem alterar auth/roles. O campo e aditivo para permitir saudacao nominal no mobile. Gates: `npm run test -- --run tests/app.test.ts` exit 0 (54 testes), `npm run typecheck` exit 0, `npm run harness` exit 0 (79 testes, build, migration dry-run e smoke local).
+- [x] Revalidacao Spec 011 backend em 2026-06-10: `npm run typecheck`, `npm run test -- --run tests/app.test.ts`, `npm run harness` e `git diff --check` passaram; nenhum schema/migration novo foi criado para o campo aditivo `name`.
 - [x] Hotfix GEO/admin CEP publicado em 2026-06-05 no commit `b0b4ea6`: CEP de Samambaia com bairro retornado como `Samambaia Sul (Samambaia)` agora e normalizado antes da consulta Nominatim, o provider tenta endereco completo, bairro/cidade e cidade/UF, consulta ate 5 resultados e escolhe a melhor confianca antes de devolver fallback amplo. Sonda real segura local e Railway do CEP informado pelo usuario retornou `hasCoordinate=true`, `precision=cep_centroid`, `confidence=medium`, sem imprimir coordenada exata. Gates: `npm run test -- --run tests/geocoding.test.ts tests/app.test.ts` exit 0 (59 testes), `npm run typecheck` exit 0, `npm run harness` exit 0 (70 testes, build, migration dry-run e smoke local) e `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke` exit 0 com limpeza de 2 eventos e 3 pedidos neutros.
 - [x] Primeiro acesso do advogado publicado em 2026-06-05 no commit `34f7fd2`: `POST /v1/admin/lawyers` provisiona convite Supabase Auth por e-mail antes de criar `profiles.role=lawyer` com `id=auth.users.id`; `POST /v1/admin/lawyers/:id/access-invite` ativa legados; `POST /v1/auth/change-password` atualiza senha autenticada e limpa `mustChangePassword`; `GET /v1/me` retorna estado seguro de primeiro acesso. Migration `0007_lawyer_access_invites.sql` aplicada no Supabase com campos operacionais e RPC de revinculo legado nao destrutivo. Gates: `npm run harness` exit 0 (69 testes, build, migration dry-run e smoke), smoke publico confirmou rota nova `401` e `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke` exit 0.
 - [x] Hotfix convite advogado publicado em 2026-06-05 no commit `dfaad5b`: `inviteUserByEmail` agora envia `redirectTo` configuravel por `LAWYER_INVITE_REDIRECT_URL` (padrao `https://advogado20admin.vercel.app/primeiro-acesso`) para nao cair no Site URL `localhost:3000` do Supabase. Gates: `npm run harness` exit 0 e `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke` exit 0. Pendente operacional: reenviar convite expirado.
@@ -143,4 +153,6 @@
 
 ## Proximo Passo
 
-Perfil do advogado com redes sociais esta `PERFIL_ADVOGADO_SOCIAIS_PRODUCAO_OK`. O pacote de edicao/oracao/parceiros esta destravado apos aplicacao da `0005` e `prod:smoke` OK. Bugfix de aprovacao por re-geocoding de CEP salvo esta localmente validado e deve ser publicado/validado em producao.
+Redirect Supabase de primeiro acesso esta corrigido e validado por sonda redigida:
+links com `redirectTo` apontam para `advogado20admin.vercel.app/primeiro-acesso`. Falta
+apenas o smoke humano de definir senha a partir de convite recebido em e-mail real valido.

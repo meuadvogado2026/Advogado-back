@@ -3,6 +3,14 @@
 **Estado:** auth/roles versionado em `openapi.yaml`  
 **Versao:** `/v1`
 
+## Spec 012 - Catalogo E Busca Por Cidade
+
+- `GET /v1/states` e `GET /v1/states/:stateId/cities`: somente ativos.
+- CRUD `/v1/admin/states` e `/v1/admin/cities`: role `admin`; vinculo bloqueia delete.
+- `POST/PATCH /v1/admin/lawyers`: aceita estado/cidade, coordenada manual e disponibilidade.
+- `POST /v1/match/by-city`: autenticado, `pageSize=5`, sem coordenada do cliente.
+- `POST /v1/match` permanece com o contrato GPS existente.
+
 ## Public/Health
 
 - `GET /health`

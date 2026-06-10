@@ -21,6 +21,12 @@ const requiredByMigration: Record<string, RegExp[]> = {
     /st_distance/i,
     /st_setsrid\(st_makepoint/i,
     /lp\.status\s*=\s*'approved'/i
+  ],
+  "0010_add_empresarial_tributario_specialties.sql": [
+    /insert into public\.legal_specialties/i,
+    /'empresarial',\s*'Direito Empresarial'/i,
+    /'tributario',\s*'Direito Tributário'/i,
+    /on conflict \(slug\) do update/i
   ]
 };
 

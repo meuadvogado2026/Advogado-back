@@ -1,5 +1,11 @@
 # Backend Test Plan - Meu Advogado 2.0
 
+## Spec 012
+
+- Roles, catalogo, duplicidade, exclusao vinculada e cidade/estado incorretos.
+- Disponibilidade, legado sem cidade, deduplicacao, paginacao 5 e allowlist.
+- Regressao de `/v1/match`; `EXPLAIN` real pendente ate migration controlada.
+
 ## Harness Obrigatorio
 
 Comando principal:

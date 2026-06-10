@@ -11,6 +11,9 @@ export function createRepositories(env: AppEnv): Repositories {
 
   const supabase = createSupabaseAdminClient(env);
   if (!supabase) {
+    if (env.NODE_ENV === "production") {
+      throw new Error("Supabase service role obrigatoria em producao.");
+    }
     return createMemoryRepositories();
   }
 

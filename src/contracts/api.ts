@@ -25,7 +25,20 @@ const safeHttpsUrlSchema = z.preprocess((value) => {
   }
 }, z.string().url().nullable());
 
-export const lawyerCreateSchema = z.object({
+const officeManualLocationSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180)
+});
+
+export const cityMatchRequestSchema = z.object({
+  stateId: z.string().uuid(),
+  cityId: z.string().uuid(),
+  areaIds: z.array(z.string()).min(1),
+  page: z.number().int().positive().default(1),
+  pageSize: z.literal(5).default(5)
+});
+
+const lawyerBaseSchema = z.object({
   name: z.string().min(3),
   email: z.string().email(),
   whatsapp: z.string().min(10),
@@ -35,6 +48,8 @@ export const lawyerCreateSchema = z.object({
   secondaryAreaIds: z.array(z.string()).default([]),
   officeCep: z.string().regex(/^\d{5}-?\d{3}$/),
   officeNumber: z.string().min(1),
+  serviceCityId: z.string().uuid(),
+  availableForMatches: z.boolean().default(true),
   avatarUrl: safeHttpsUrlSchema.optional(),
   coverUrl: safeHttpsUrlSchema.optional(),
   miniBio: z.string().trim().max(240).nullable().optional(),
@@ -46,15 +61,30 @@ export const lawyerCreateSchema = z.object({
   status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).default("draft")
 });
 
-const officeManualLocationSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180)
+export const lawyerCreateSchema = lawyerBaseSchema.extend({
+  serviceStateId: z.string().uuid(),
+  officeManualLocation: officeManualLocationSchema
 });
 
-export const lawyerPatchSchema = lawyerCreateSchema.partial().extend({
+export const lawyerPatchSchema = lawyerBaseSchema.partial().extend({
+  serviceStateId: z.string().uuid().optional(),
   status: z.enum(["draft", "pending_review", "approved", "rejected", "suspended"]).optional(),
   officeManualLocation: officeManualLocationSchema.optional()
 });
+
+export const stateCreateSchema = z.object({
+  code: z.string().trim().length(2).transform((value) => value.toUpperCase()),
+  name: z.string().trim().min(2).max(120),
+  active: z.boolean().default(true)
+});
+export const statePatchSchema = stateCreateSchema.partial();
+export const cityCreateSchema = z.object({
+  stateId: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  active: z.boolean().default(true),
+  center: officeManualLocationSchema
+});
+export const cityPatchSchema = cityCreateSchema.partial();
 
 export const geocodeCepSchema = z.object({
   cep: z.string().regex(/^\d{5}-?\d{3}$/),
@@ -103,7 +133,11 @@ export const changePasswordSchema = z.object({
 });
 
 export type MatchRequest = z.infer<typeof matchRequestSchema>;
-export type LawyerCreate = z.infer<typeof lawyerCreateSchema>;
+export type CityMatchRequest = z.infer<typeof cityMatchRequestSchema>;
+export type LawyerCreate = Omit<z.infer<typeof lawyerBaseSchema>, "serviceCityId" | "availableForMatches"> & {
+  serviceCityId?: string | null;
+  availableForMatches?: boolean;
+};
 export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
 export type GeocodeCep = z.infer<typeof geocodeCepSchema>;
 export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
@@ -114,3 +148,7 @@ export type AdminLawyerImageUpload = z.infer<typeof adminLawyerImageUploadSchema
 export type AdminPartnerLogoCreate = z.infer<typeof adminPartnerLogoCreateSchema>;
 export type ClientSignup = z.infer<typeof clientSignupSchema>;
 export type ChangePassword = z.infer<typeof changePasswordSchema>;
+export type StateCreate = z.infer<typeof stateCreateSchema>;
+export type StatePatch = z.infer<typeof statePatchSchema>;
+export type CityCreate = z.infer<typeof cityCreateSchema>;
+export type CityPatch = z.infer<typeof cityPatchSchema>;

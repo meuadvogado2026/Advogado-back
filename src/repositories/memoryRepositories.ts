@@ -1,7 +1,9 @@
-import type { LawyerCreate, LawyerPatch } from "../contracts/api.js";
+import type { CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
 import { legalAreas } from "../modules/areas/legalAreas.js";
 import type {
   AuditLogRepository,
+  CityRecord,
+  GeographyRepository,
   LawyerDashboardRepository,
   LawyerMediaRepository,
   LawyerOfficeLocation,
@@ -24,6 +26,15 @@ import type {
 
 const profiles = new Map<string, Profile>();
 const lawyers = new Map<string, LawyerRecord>();
+const states = new Map<string, import("./types.js").StateRecord>();
+const cities = new Map<string, CityRecord>();
+const DEFAULT_STATE_ID = "10000000-0000-4000-8000-000000000001";
+const DEFAULT_CITY_ID = "20000000-0000-4000-8000-000000000001";
+if (states.size === 0) {
+  const now = new Date().toISOString();
+  states.set(DEFAULT_STATE_ID, { id: DEFAULT_STATE_ID, code: "DF", name: "Distrito Federal", active: true, createdAt: now, updatedAt: now });
+  cities.set(DEFAULT_CITY_ID, { id: DEFAULT_CITY_ID, stateId: DEFAULT_STATE_ID, stateCode: "DF", name: "Brasilia", active: true, center: { lat: -15.793889, lng: -47.882778 }, createdAt: now, updatedAt: now });
+}
 const prayerRequests: Array<{
   id: string;
   clientProfileId: string | null;
@@ -91,6 +102,50 @@ profiles.set("test-lawyer-user", {
   email: "lawyer@example.test",
   avatarUrl: "https://example.test/lawyer-avatar.jpg",
   coverUrl: null,
+  blockedAt: null,
+  mustChangePassword: false,
+  accessInvitedAt: seedCreatedAt,
+  firstLoginCompletedAt: seedCreatedAt,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
+});
+
+profiles.set("fixture-lawyer-sp-profile", {
+  id: "fixture-lawyer-sp-profile",
+  role: "lawyer",
+  name: "Dra. Ana Geo",
+  email: "fixture-lawyer-sp@example.test",
+  phone: "11988887777",
+  avatarUrl: "https://example.test/ana-avatar.jpg",
+  coverUrl: "https://example.test/ana-cover.jpg",
+  blockedAt: null,
+  mustChangePassword: false,
+  accessInvitedAt: seedCreatedAt,
+  firstLoginCompletedAt: seedCreatedAt,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
+});
+
+profiles.set("fixture-lawyer-rj-profile", {
+  id: "fixture-lawyer-rj-profile",
+  role: "lawyer",
+  name: "Dr. Bruno Costa",
+  email: "fixture-lawyer-rj@example.test",
+  phone: "21977776666",
+  blockedAt: null,
+  mustChangePassword: false,
+  accessInvitedAt: seedCreatedAt,
+  firstLoginCompletedAt: seedCreatedAt,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
+});
+
+profiles.set("fixture-lawyer-pending-profile", {
+  id: "fixture-lawyer-pending-profile",
+  role: "lawyer",
+  name: "Dr. Pendente",
+  email: "fixture-lawyer-pending@example.test",
+  phone: "11000000000",
   blockedAt: null,
   mustChangePassword: false,
   accessInvitedAt: seedCreatedAt,
@@ -247,6 +302,63 @@ class MemoryLegalSpecialtyRepository implements LegalSpecialtyRepository {
   }
 }
 
+const normalizeGeoName = (value: string) => value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+class MemoryGeographyRepository implements GeographyRepository {
+  async listStates(activeOnly = false) {
+    return Array.from(states.values()).filter((state) => !activeOnly || state.active).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async getState(id: string) { return states.get(id) ?? null; }
+  async createState(input: StateCreate) {
+    if (Array.from(states.values()).some((state) => state.code === input.code)) throw new Error("GEO_DUPLICATE");
+    const now = new Date().toISOString();
+    const state = { id: crypto.randomUUID(), ...input, createdAt: now, updatedAt: now };
+    states.set(state.id, state);
+    return state;
+  }
+  async updateState(id: string, patch: StatePatch) {
+    const current = states.get(id);
+    if (!current) return null;
+    const updated = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    states.set(id, updated);
+    return updated;
+  }
+  async deleteState(id: string) {
+    if (!states.has(id)) return "not_found" as const;
+    if (Array.from(cities.values()).some((city) => city.stateId === id)) return "linked" as const;
+    states.delete(id);
+    return "deleted" as const;
+  }
+  async listCities(stateId?: string, activeOnly = false) {
+    return Array.from(cities.values()).filter((city) => (!stateId || city.stateId === stateId) && (!activeOnly || city.active)).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async getCity(id: string) { return cities.get(id) ?? null; }
+  async createCity(input: CityCreate) {
+    const state = states.get(input.stateId);
+    if (!state) throw new Error("GEO_STATE_NOT_FOUND");
+    if (Array.from(cities.values()).some((city) => city.stateId === input.stateId && normalizeGeoName(city.name) === normalizeGeoName(input.name))) throw new Error("GEO_DUPLICATE");
+    const now = new Date().toISOString();
+    const city: CityRecord = { id: crypto.randomUUID(), stateId: state.id, stateCode: state.code, name: input.name, active: input.active, center: input.center, createdAt: now, updatedAt: now };
+    cities.set(city.id, city);
+    return city;
+  }
+  async updateCity(id: string, patch: CityPatch) {
+    const current = cities.get(id);
+    if (!current) return null;
+    const state = states.get(patch.stateId ?? current.stateId);
+    if (!state) throw new Error("GEO_STATE_NOT_FOUND");
+    const updated: CityRecord = { ...current, ...patch, stateId: state.id, stateCode: state.code, center: patch.center ?? current.center, updatedAt: new Date().toISOString() };
+    cities.set(id, updated);
+    return updated;
+  }
+  async deleteCity(id: string) {
+    if (!cities.has(id)) return "not_found" as const;
+    if (Array.from(lawyers.values()).some((lawyer) => lawyer.serviceCityId === id)) return "linked" as const;
+    cities.delete(id);
+    return "deleted" as const;
+  }
+}
+
 class MemoryLawyerRepository implements LawyerRepository {
   constructor(private readonly profileRepository: ProfileRepository) {}
 
@@ -269,6 +381,8 @@ class MemoryLawyerRepository implements LawyerRepository {
       id: crypto.randomUUID(),
       profileId: profile.id,
       ...input,
+      serviceCityId: input.serviceCityId ?? null,
+      availableForMatches: input.availableForMatches ?? true,
       officeCity: location?.address?.city ?? null,
       officeState: location?.address?.state ?? null,
       officeLat: location?.coordinates?.lat ?? null,
@@ -366,6 +480,7 @@ class MemoryAuditLogRepository implements AuditLogRepository {
 
 type MatchFixture = {
   id: string;
+  profileId: string;
   name: string;
   whatsapp: string;
   city: string;
@@ -396,6 +511,7 @@ type MatchFixture = {
 const matchFixtures: MatchFixture[] = [
   {
     id: "fixture-lawyer-sp",
+    profileId: "fixture-lawyer-sp-profile",
     name: "Dra. Ana Geo",
     whatsapp: "11988887777",
     city: "Sao Paulo",
@@ -419,6 +535,7 @@ const matchFixtures: MatchFixture[] = [
   },
   {
     id: "fixture-lawyer-rj",
+    profileId: "fixture-lawyer-rj-profile",
     name: "Dr. Bruno Costa",
     whatsapp: "21977776666",
     city: "Rio de Janeiro",
@@ -435,6 +552,7 @@ const matchFixtures: MatchFixture[] = [
   {
     // Mesmo perfil/area do SP, porem nao aprovado: nunca deve aparecer no match.
     id: "fixture-lawyer-pending",
+    profileId: "fixture-lawyer-pending-profile",
     name: "Dr. Pendente",
     whatsapp: "11000000000",
     city: "Sao Paulo",
@@ -468,6 +586,7 @@ class MemoryMatchRepository implements MatchRepository {
   async findNearest(input: NearestLawyerInput) {
     const candidate = matchFixtures
       .filter((fixture) => fixture.status === "approved")
+      .filter((fixture) => profiles.get(fixture.profileId)?.blockedAt == null)
       .filter(
         (fixture) =>
           fixture.officeGeocodeConfidence === "high" &&
@@ -498,12 +617,40 @@ class MemoryMatchRepository implements MatchRepository {
       distanceReliable: true
     };
   }
+
+  async findByCity(input: { stateId: string; cityId: string; areaIds: string[]; page: number; pageSize: 5 }) {
+    const city = cities.get(input.cityId);
+    if (!city || city.stateId !== input.stateId || !city.active || !states.get(input.stateId)?.active) return { lawyers: [], total: 0 };
+    const candidates = Array.from(lawyers.values())
+      .filter((lawyer) => lawyer.status === "approved" && lawyer.availableForMatches !== false && lawyer.serviceCityId === input.cityId)
+      .filter((lawyer) => profiles.get(lawyer.profileId)?.blockedAt == null)
+      .filter((lawyer) => lawyer.officeLocationStatus === "validated")
+      .filter((lawyer) => [lawyer.mainAreaId, ...lawyer.secondaryAreaIds].some((area) => input.areaIds.includes(area)))
+      .map((lawyer) => ({ lawyer, distance: roundKm(haversineKm(city.center.lat, city.center.lng, lawyer.officeLat!, lawyer.officeLng!)) }))
+      .sort((a, b) => a.distance - b.distance || a.lawyer.id.localeCompare(b.lawyer.id));
+    const start = (input.page - 1) * input.pageSize;
+    return {
+      total: candidates.length,
+      lawyers: candidates.slice(start, start + input.pageSize).map(({ lawyer, distance }) => ({
+        id: lawyer.id,
+        name: lawyer.name,
+        whatsapp: lawyer.whatsapp,
+        city: city.name,
+        state: city.stateCode,
+        areaIds: [lawyer.mainAreaId, ...lawyer.secondaryAreaIds],
+        avatarUrl: lawyer.avatarUrl ?? null,
+        coverUrl: lawyer.coverUrl ?? null,
+        distanceFromCityCenterKm: distance
+      }))
+    };
+  }
 }
 
 class MemoryPublicLawyerProfileRepository implements PublicLawyerProfileRepository {
   async getApprovedById(id: string) {
     const fixture = matchFixtures.find((candidate) => candidate.id === id && candidate.status === "approved");
     if (!fixture) return null;
+    if (profiles.get(fixture.profileId)?.blockedAt) return null;
 
     return {
       id: fixture.id,
@@ -694,6 +841,7 @@ export function createMemoryRepositories(): Repositories {
   return {
     profiles: profileRepository,
     legalSpecialties: new MemoryLegalSpecialtyRepository(),
+    geographies: new MemoryGeographyRepository(),
     lawyers: new MemoryLawyerRepository(profileRepository),
     publicLawyerProfiles: new MemoryPublicLawyerProfileRepository(),
     lawyerDashboards: new MemoryLawyerDashboardRepository(),

@@ -104,6 +104,7 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
     return reply.code(200).send({
       user: {
         id: request.currentUser!.id,
+        name: profile?.name ?? request.currentUser!.name,
         email: request.currentUser!.email,
         role: request.currentUser!.role,
         mustChangePassword: profile?.mustChangePassword ?? false,
@@ -121,6 +122,7 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
     return {
       user: {
         id: request.currentUser!.id,
+        name: profile?.name ?? request.currentUser!.name,
         email: request.currentUser!.email,
         role: request.currentUser!.role,
         mustChangePassword: profile?.mustChangePassword ?? request.currentUser!.mustChangePassword ?? false,

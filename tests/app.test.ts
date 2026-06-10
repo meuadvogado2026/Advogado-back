@@ -1,10 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import { loadEnv } from "../src/config/env.js";
 import { createMemoryRepositories } from "../src/repositories/memoryRepositories.js";
+import { createRepositories } from "../src/repositories/index.js";
 
 const ADMIN = { authorization: "Bearer test-admin-token" };
 const CLIENT = { authorization: "Bearer test-client-token" };
 const LAWYER = { authorization: "Bearer test-lawyer-token" };
+const SERVICE_STATE_ID = "10000000-0000-4000-8000-000000000001";
+const SERVICE_CITY_ID = "20000000-0000-4000-8000-000000000001";
 
 // Cadastro minimo de advogado sem coordenada (geocoding nao executado).
 const draftWithoutCoordinate = (overrides: Record<string, unknown> = {}) => ({
@@ -130,6 +135,33 @@ describe("foundation API", () => {
     expect(body.distanceKm).toBeUndefined();
     expect(body.distanceReliable).toBe(false);
     expect(body.distanceNotice).toContain("confirmacao");
+  });
+
+  it("does not expose a blocked lawyer through match or public profile", async () => {
+    const repos = createMemoryRepositories();
+    await repos.profiles.updateBlocked("fixture-lawyer-sp-profile", true);
+    const app = await buildApp(repos);
+    try {
+      const match = await app.inject({
+        method: "POST",
+        url: "/v1/match",
+        headers: CLIENT,
+        payload: { lat: -23.55052, lng: -46.633308, accuracyM: 30, areaIds: ["civil"] }
+      });
+      const profile = await app.inject({
+        method: "GET",
+        url: "/v1/lawyers/fixture-lawyer-sp",
+        headers: CLIENT
+      });
+
+      expect(match.statusCode).toBe(200);
+      expect(match.json()).toMatchObject({ status: "empty", lawyer: null });
+      expect(profile.statusCode).toBe(404);
+      expect(profile.json().error.code).toBe("NOT_FOUND");
+    } finally {
+      await repos.profiles.updateBlocked("fixture-lawyer-sp-profile", false);
+      await app.close();
+    }
   });
 
   it("keeps match response available when event recording fails", async () => {
@@ -276,6 +308,8 @@ describe("foundation API", () => {
       headers: ADMIN,
       payload: {
         name: "Dra. Url Insegura",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         email: "insecure-url@example.test",
         whatsapp: "11955554444",
         oabNumber: "778899",
@@ -284,6 +318,7 @@ describe("foundation API", () => {
         secondaryAreaIds: [],
         officeCep: "01001-000",
         officeNumber: "200",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
         avatarUrl: "http://example.test/avatar.jpg",
         instagramUrl: "http://instagram.com/inseguro",
         status: "draft"
@@ -302,7 +337,13 @@ describe("foundation API", () => {
     await app.close();
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().areas.length).toBeGreaterThan(0);
+    expect(response.json().areas).toHaveLength(8);
+    expect(response.json().areas).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "empresarial", name: "Direito Empresarial" }),
+        expect.objectContaining({ id: "tributario", name: "Direito Tributário" })
+      ])
+    );
   });
 
   it("requires auth on profile session endpoint", async () => {
@@ -327,6 +368,7 @@ describe("foundation API", () => {
     expect(response.json()).toEqual({
       user: {
         id: "test-admin-user",
+        name: "Admin Teste",
         email: "admin@example.test",
         role: "admin",
         mustChangePassword: false,
@@ -349,6 +391,7 @@ describe("foundation API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().user).toMatchObject({
       id: "test-lawyer-user",
+      name: "Dra. Teste",
       role: "lawyer",
       mustChangePassword: false
     });
@@ -379,6 +422,28 @@ describe("foundation API", () => {
     });
     expect(response.json().user.password).toBeUndefined();
     expect(response.json().user.token).toBeUndefined();
+  });
+
+  it("fails production repository setup instead of falling back to memory when Supabase is not configured", () => {
+    const env = loadEnv({
+      NODE_ENV: "production",
+      SUPABASE_URL: "https://qpemxkiowiiklztgumqy.supabase.co"
+    });
+
+    expect(() => createRepositories(env)).toThrow("Supabase service role obrigatoria");
+  });
+
+  it("keeps database security and match performance guards versioned", () => {
+    const hardeningSql = readFileSync("src/db/migrations/0009_match_security_hardening.sql", "utf8");
+
+    expect(hardeningSql).toMatch(/revoke execute on function public\.activate_lawyer_profile_access/i);
+    expect(hardeningSql).toMatch(/from public/i);
+    expect(hardeningSql).toMatch(/from anon/i);
+    expect(hardeningSql).toMatch(/from authenticated/i);
+    expect(hardeningSql).toMatch(/grant execute on function public\.activate_lawyer_profile_access/i);
+    expect(hardeningSql).toMatch(/to service_role/i);
+    expect(hardeningSql).toMatch(/p\.blocked_at\s+is\s+null/i);
+    expect(hardeningSql).toMatch(/st_dwithin/i);
   });
 
   it("validates public client signup payload", async () => {
@@ -442,6 +507,8 @@ describe("foundation API", () => {
       headers: { authorization: "Bearer test-admin-token" },
       payload: {
         name: "Dra. Smoke Test",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         email: "smoke-lawyer@example.test",
         whatsapp: "11999999999",
         oabNumber: "123456",
@@ -450,6 +517,7 @@ describe("foundation API", () => {
         secondaryAreaIds: ["consumidor"],
         officeCep: "01001-000",
         officeNumber: "100",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
         status: "draft"
       }
     });
@@ -504,6 +572,8 @@ describe("foundation API", () => {
       headers: ADMIN,
       payload: {
         name: "Dra. Lista Admin",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         email,
         whatsapp: "11999998888",
         oabNumber: "456789",
@@ -512,6 +582,7 @@ describe("foundation API", () => {
         secondaryAreaIds: ["consumidor"],
         officeCep: "01001-000",
         officeNumber: "101",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
         status: "draft"
       }
     });
@@ -541,6 +612,8 @@ describe("foundation API", () => {
       headers: ADMIN,
       payload: {
         name: "Dra. Coordenada Persistida",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         email: "persist-coord@example.test",
         whatsapp: "11955554444",
         oabNumber: "778899",
@@ -549,6 +622,7 @@ describe("foundation API", () => {
         secondaryAreaIds: [],
         officeCep: "01001-000",
         officeNumber: "200",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
         status: "approved"
       }
     });
@@ -562,9 +636,37 @@ describe("foundation API", () => {
     expect(typeof body.lawyer.officeLat).toBe("number");
     expect(typeof body.lawyer.officeLng).toBe("number");
     expect(typeof body.coordinates.lat).toBe("number");
-    expect(body.lawyer.officeGeocodePrecision).toBe("street");
+    expect(body.lawyer.officeGeocodeProvider).toBe("manual");
+    expect(body.lawyer.officeGeocodePrecision).toBe("manual");
     expect(body.lawyer.officeGeocodeConfidence).toBe("high");
     expect(body.lawyer.officeLocationStatus).toBe("validated");
+  });
+
+  it("requires a final confirmed coordinate when creating any lawyer", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyers",
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Sem Pin Confirmado",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
+        email: "sem-pin@example.test",
+        whatsapp: "11955554444",
+        oabNumber: "778800",
+        oabState: "SP",
+        mainAreaId: "civil",
+        secondaryAreaIds: [],
+        officeCep: "01001-000",
+        officeNumber: "200",
+        status: "draft"
+      }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe("VALIDATION_ERROR");
   });
 
   it("lets admin confirm a lawyer office location manually before approval", async () => {
@@ -578,6 +680,8 @@ describe("foundation API", () => {
       headers: ADMIN,
       payload: {
         status: "approved",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         officeManualLocation: { lat: -23.55052, lng: -46.633308 }
       }
     });
@@ -621,7 +725,7 @@ describe("foundation API", () => {
       method: "PATCH",
       url: `/v1/admin/lawyers/${draft.id}`,
       headers: ADMIN,
-      payload: { status: "approved", officeCep: "01001-000" }
+      payload: { status: "approved", serviceStateId: SERVICE_STATE_ID, serviceCityId: SERVICE_CITY_ID, officeCep: "01001-000" }
     });
     await app.close();
 
@@ -643,7 +747,7 @@ describe("foundation API", () => {
       method: "PATCH",
       url: `/v1/admin/lawyers/${draft.id}`,
       headers: ADMIN,
-      payload: { status: "approved" }
+      payload: { status: "approved", serviceStateId: SERVICE_STATE_ID, serviceCityId: SERVICE_CITY_ID }
     });
     await app.close();
 
@@ -678,7 +782,7 @@ describe("foundation API", () => {
       method: "PATCH",
       url: `/v1/admin/lawyers/${draft.id}`,
       headers: ADMIN,
-      payload: { status: "approved" }
+      payload: { status: "approved", serviceStateId: SERVICE_STATE_ID, serviceCityId: SERVICE_CITY_ID }
     });
     await app.close();
 
@@ -696,6 +800,8 @@ describe("foundation API", () => {
       headers: ADMIN,
       payload: {
         name: "Dra. Editavel",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         email: `editavel-${Date.now()}@example.test`,
         whatsapp: "11955554444",
         oabNumber: "778899",
@@ -704,6 +810,7 @@ describe("foundation API", () => {
         secondaryAreaIds: [],
         officeCep: "01001-000",
         officeNumber: "200",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
         status: "draft"
       }
     });
@@ -752,6 +859,8 @@ describe("foundation API", () => {
       headers: ADMIN,
       payload: {
         name: "Dra. Status Persistente",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
         email: `status-persistente-${Date.now()}@example.test`,
         whatsapp: "11955554444",
         oabNumber: "778899",
@@ -760,6 +869,7 @@ describe("foundation API", () => {
         secondaryAreaIds: [],
         officeCep: "01001-000",
         officeNumber: "200",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
         status: "draft"
       }
     });
@@ -1077,5 +1187,60 @@ describe("foundation API", () => {
     expect(create.json().partner).toMatchObject({ name: "Parceiro Teste", active: true });
     expect(adminList.json().partners[0].logoUrl).toBe(upload.json().image.url);
     expect(publicList.json().partners[0]).toMatchObject({ name: "Parceiro Teste", logoUrl: upload.json().image.url });
+  });
+
+  it("manages states and cities with duplicate and linked-delete protection", async () => {
+    const repos = createMemoryRepositories();
+    const app = await buildApp(repos);
+    const state = await app.inject({ method: "POST", url: "/v1/admin/states", headers: ADMIN, payload: { code: "SP", name: "Sao Paulo", active: true } });
+    const stateId = state.json().state.id;
+    const cityPayload = { stateId, name: "Campinas", active: true, center: { lat: -22.9056, lng: -47.0608 } };
+    const city = await app.inject({ method: "POST", url: "/v1/admin/cities", headers: ADMIN, payload: cityPayload });
+    const duplicate = await app.inject({ method: "POST", url: "/v1/admin/cities", headers: ADMIN, payload: cityPayload });
+    const deleteLinkedState = await app.inject({ method: "DELETE", url: `/v1/admin/states/${stateId}`, headers: ADMIN });
+    const publicCities = await app.inject({ method: "GET", url: `/v1/states/${stateId}/cities` });
+    await app.close();
+
+    expect(state.statusCode).toBe(201);
+    expect(city.statusCode).toBe(201);
+    expect(duplicate.statusCode).toBe(409);
+    expect(deleteLinkedState.statusCode).toBe(409);
+    expect(publicCities.json().cities).toHaveLength(1);
+  });
+
+  it("returns paginated city matches without client coordinates or fallback", async () => {
+    const repos = createMemoryRepositories();
+    const city = await repos.geographies.createCity({
+      stateId: SERVICE_STATE_ID,
+      name: `Cidade Match ${Date.now()}`,
+      active: true,
+      center: { lat: -15.793889, lng: -47.882778 }
+    });
+    await repos.lawyers.create(
+      { ...draftWithoutCoordinate({ name: "Dra. Cidade", email: "cidade@example.test", status: "approved" }), serviceCityId: city.id, availableForMatches: true },
+      {
+        address: { city: "Brasilia", state: "DF" },
+        coordinates: { lat: -15.8, lng: -47.9 },
+        geocode: { provider: "manual", precision: "manual", confidence: "high" }
+      }
+    );
+    const app = await buildApp(repos);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/match/by-city",
+      headers: CLIENT,
+      payload: { stateId: SERVICE_STATE_ID, cityId: city.id, areaIds: ["civil"], page: 1, pageSize: 5 }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: "matched",
+      lawyers: [{ name: "Dra. Cidade", state: "DF" }],
+      pagination: { page: 1, pageSize: 5, total: 1, totalPages: 1 },
+      algorithmVersion: "city-nearest-v1"
+    });
+    expect(response.json().lawyers[0]).not.toHaveProperty("officeCep");
+    expect(response.json().lawyers[0]).not.toHaveProperty("lat");
   });
 });

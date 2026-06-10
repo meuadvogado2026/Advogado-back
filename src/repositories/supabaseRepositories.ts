@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { LawyerCreate, LawyerPatch } from "../contracts/api.js";
+import type { CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
 import type {
   AuditLogRepository,
   AdminPrayerRequestRecord,
   AdminUserRecord,
+  GeographyRepository,
   LawyerCoordinates,
   LawyerDashboard,
   LawyerDashboardRepository,
@@ -256,9 +257,71 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
   }
 }
 
+class SupabaseGeographyRepository implements GeographyRepository {
+  constructor(private readonly supabase: SupabaseClient) {}
+  async listStates(activeOnly = false) {
+    let query = this.supabase.from("states").select("id, code, name, active, created_at, updated_at").order("name");
+    if (activeOnly) query = query.eq("active", true);
+    const { data, error } = await query;
+    assertSupabaseOk(error, "states.list");
+    return (data ?? []).map((row: any) => ({ id: row.id, code: row.code, name: row.name, active: row.active, createdAt: row.created_at, updatedAt: row.updated_at }));
+  }
+  async getState(id: string) { return (await this.listStates()).find((state) => state.id === id) ?? null; }
+  async createState(input: StateCreate) {
+    const { data, error } = await this.supabase.from("states").insert({ code: input.code, name: input.name, active: input.active }).select("id, code, name, active, created_at, updated_at").single();
+    if ((error as any)?.code === "23505") throw new Error("GEO_DUPLICATE");
+    assertSupabaseOk(error, "states.create");
+    return { id: data!.id, code: data!.code, name: data!.name, active: data!.active, createdAt: data!.created_at, updatedAt: data!.updated_at };
+  }
+  async updateState(id: string, patch: StatePatch) {
+    const { data, error } = await this.supabase.from("states").update(patch).eq("id", id).select("id, code, name, active, created_at, updated_at").maybeSingle();
+    assertSupabaseOk(error, "states.update");
+    return data ? { id: data.id, code: data.code, name: data.name, active: data.active, createdAt: data.created_at, updatedAt: data.updated_at } : null;
+  }
+  async deleteState(id: string) {
+    const { error, count } = await this.supabase.from("states").delete({ count: "exact" }).eq("id", id);
+    if ((error as any)?.code === "23503") return "linked" as const;
+    assertSupabaseOk(error, "states.delete");
+    return count ? "deleted" as const : "not_found" as const;
+  }
+  async listCities(stateId?: string, activeOnly = false) {
+    let query = this.supabase.from("cities").select("id, state_id, name, active, center_location, created_at, updated_at, states!inner(code)").order("name");
+    if (stateId) query = query.eq("state_id", stateId);
+    if (activeOnly) query = query.eq("active", true);
+    const { data, error } = await query;
+    assertSupabaseOk(error, "cities.list");
+    return (data ?? []).map((row: any) => ({ id: row.id, stateId: row.state_id, stateCode: Array.isArray(row.states) ? row.states[0]?.code : row.states?.code, name: row.name, active: row.active, center: { lat: Number(row.center_location?.coordinates?.[1] ?? 0), lng: Number(row.center_location?.coordinates?.[0] ?? 0) }, createdAt: row.created_at, updatedAt: row.updated_at }));
+  }
+  async getCity(id: string) { return (await this.listCities()).find((city) => city.id === id) ?? null; }
+  async createCity(input: CityCreate) {
+    const payload = { state_id: input.stateId, name: input.name, normalized_name: input.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(), active: input.active, center_location: toOfficeLocation(input.center) };
+    const { data, error } = await this.supabase.from("cities").insert(payload).select("id").single();
+    if ((error as any)?.code === "23505") throw new Error("GEO_DUPLICATE");
+    assertSupabaseOk(error, "cities.create");
+    return (await this.getCity(data!.id))!;
+  }
+  async updateCity(id: string, patch: CityPatch) {
+    const payload: Record<string, unknown> = {};
+    if (patch.stateId) payload.state_id = patch.stateId;
+    if (patch.name) { payload.name = patch.name; payload.normalized_name = patch.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+    if (patch.active !== undefined) payload.active = patch.active;
+    if (patch.center) payload.center_location = toOfficeLocation(patch.center);
+    const { data, error } = await this.supabase.from("cities").update(payload).eq("id", id).select("id").maybeSingle();
+    if ((error as any)?.code === "23505") throw new Error("GEO_DUPLICATE");
+    assertSupabaseOk(error, "cities.update");
+    return data ? this.getCity(id) : null;
+  }
+  async deleteCity(id: string) {
+    const { error, count } = await this.supabase.from("cities").delete({ count: "exact" }).eq("id", id);
+    if ((error as any)?.code === "23503") return "linked" as const;
+    assertSupabaseOk(error, "cities.delete");
+    return count ? "deleted" as const : "not_found" as const;
+  }
+}
+
 // Inclui office_lat/office_lng para refletir a coordenada persistida no escritorio.
 const LAWYER_COLUMNS =
-  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_cep, office_number, office_city, office_state, office_lat, office_lng, office_location, office_geocode_provider, office_geocode_precision, office_geocode_confidence, office_geocoded_at, created_at, updated_at";
+  "id, profile_id, status, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_cep, office_number, office_city, office_state, office_lat, office_lng, office_location, office_geocode_provider, office_geocode_precision, office_geocode_confidence, office_geocoded_at, service_city_id, available_for_matches, created_at, updated_at";
 
 type LawyerRow = {
   id: string;
@@ -284,6 +347,8 @@ type LawyerRow = {
   office_geocode_precision: LawyerRecord["officeGeocodePrecision"];
   office_geocode_confidence: LawyerRecord["officeGeocodeConfidence"];
   office_geocoded_at: string | null;
+  service_city_id: string | null;
+  available_for_matches: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -362,6 +427,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
       officeNumber: row.office_number,
       officeCity: row.office_city,
       officeState: row.office_state,
+      serviceCityId: row.service_city_id,
+      availableForMatches: row.available_for_matches,
       status: row.status,
       officeLat: toCoord(row.office_lat),
       officeLng: toCoord(row.office_lng),
@@ -466,7 +533,9 @@ class SupabaseLawyerRepository implements LawyerRepository {
       facebook_url: input.facebookUrl ?? null,
       website_url: input.websiteUrl ?? null,
       office_cep: input.officeCep.replace(/\D/g, ""),
-      office_number: input.officeNumber
+      office_number: input.officeNumber,
+      service_city_id: input.serviceCityId ?? null,
+      available_for_matches: input.availableForMatches ?? true
     };
     if (location?.address) {
       insertPayload.office_city = location.address.city;
@@ -552,6 +621,8 @@ class SupabaseLawyerRepository implements LawyerRepository {
     if (patch.websiteUrl !== undefined) updatePayload.website_url = patch.websiteUrl;
     if (patch.officeCep) updatePayload.office_cep = patch.officeCep.replace(/\D/g, "");
     if (patch.officeNumber) updatePayload.office_number = patch.officeNumber;
+    if (patch.serviceCityId) updatePayload.service_city_id = patch.serviceCityId;
+    if (patch.availableForMatches !== undefined) updatePayload.available_for_matches = patch.availableForMatches;
     if (location?.address) {
       updatePayload.office_city = location.address.city;
       updatePayload.office_state = location.address.state;
@@ -627,7 +698,9 @@ type PublicLawyerProfileRow = {
   website_url: string | null;
   office_city: string | null;
   office_state: string | null;
-  profiles: { name: string; avatar_url: string | null; cover_url: string | null } | Array<{ name: string; avatar_url: string | null; cover_url: string | null }>;
+  profiles:
+    | { name: string; avatar_url: string | null; cover_url: string | null; blocked_at: string | null }
+    | Array<{ name: string; avatar_url: string | null; cover_url: string | null; blocked_at: string | null }>;
   lawyer_specialties: Array<{
     specialty_id: string;
     legal_specialties: { id: string; name: string } | Array<{ id: string; name: string }>;
@@ -649,10 +722,11 @@ class SupabasePublicLawyerProfileRepository implements PublicLawyerProfileReposi
     const { data, error } = await this.supabase
       .from("lawyer_profiles")
       .select(
-        "id, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_city, office_state, profiles!inner(name, avatar_url, cover_url), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
+        "id, oab_number, oab_state, whatsapp, mini_bio, full_bio, instagram_url, linkedin_url, facebook_url, website_url, office_city, office_state, profiles!inner(name, avatar_url, cover_url, blocked_at), lawyer_specialties(specialty_id, legal_specialties!inner(id, name))"
       )
       .eq("id", id)
       .eq("status", "approved")
+      .is("profiles.blocked_at", null)
       .maybeSingle();
     assertSupabaseOk(error, "lawyer_profiles.getApprovedPublicById");
     if (!data) return null;
@@ -743,12 +817,13 @@ class SupabaseMatchRepository implements MatchRepository {
     const { data: profileData, error: profileError } = profileId
       ? await this.supabase
           .from("profiles")
-          .select("avatar_url, cover_url")
+          .select("avatar_url, cover_url, blocked_at")
           .eq("id", profileId)
           .maybeSingle()
       : { data: null, error: null };
     assertSupabaseOk(profileError, "match.findNearestVisuals");
-    const profile = profileData as { avatar_url: string | null; cover_url: string | null } | null;
+    const profile = profileData as { avatar_url: string | null; cover_url: string | null; blocked_at: string | null } | null;
+    if (!profile || profile.blocked_at) return null;
 
     return {
       lawyer: {
@@ -763,6 +838,38 @@ class SupabaseMatchRepository implements MatchRepository {
       },
       distanceKm: Number(row.distance_km),
       distanceReliable: true
+    };
+  }
+
+  async findByCity(input: { stateId: string; cityId: string; areaIds: string[]; page: number; pageSize: 5 }) {
+    const { data, error } = await this.supabase.rpc("match_lawyers_by_city", {
+      p_state_id: input.stateId,
+      p_city_id: input.cityId,
+      p_area_ids: input.areaIds,
+      p_limit: input.pageSize,
+      p_offset: (input.page - 1) * input.pageSize
+    });
+    assertSupabaseOk(error, "match.findByCity");
+    const rows = (data ?? []) as Array<any>;
+    if (rows.length === 0) return { lawyers: [], total: 0 };
+    const ids = rows.map((row) => row.lawyer_profile_id);
+    const { data: lawyerRows, error: lawyerError } = await this.supabase.from("lawyer_profiles").select("id, profile_id").in("id", ids);
+    assertSupabaseOk(lawyerError, "match.findByCityProfiles");
+    const profileIds = (lawyerRows ?? []).map((row: any) => row.profile_id);
+    const { data: profileRows, error: profileError } = await this.supabase.from("profiles").select("id, avatar_url, cover_url").in("id", profileIds);
+    assertSupabaseOk(profileError, "match.findByCityVisuals");
+    const lawyerProfile = new Map((lawyerRows ?? []).map((row: any) => [row.id, row.profile_id]));
+    const visuals = new Map((profileRows ?? []).map((row: any) => [row.id, row]));
+    return {
+      total: Number(rows[0]?.total_count ?? 0),
+      lawyers: rows.map((row) => {
+        const visual = visuals.get(lawyerProfile.get(row.lawyer_profile_id));
+        return {
+          id: row.lawyer_profile_id, name: row.name, whatsapp: row.whatsapp, city: row.city_name, state: row.state_code,
+          areaIds: row.area_ids ?? [], avatarUrl: visual?.avatar_url ?? null, coverUrl: visual?.cover_url ?? null,
+          distanceFromCityCenterKm: Number(row.distance_from_city_center_km)
+        };
+      })
     };
   }
 }
@@ -1083,6 +1190,7 @@ export function createSupabaseRepositories(supabase: SupabaseClient): Repositori
   return {
     profiles,
     legalSpecialties: new SupabaseLegalSpecialtyRepository(supabase),
+    geographies: new SupabaseGeographyRepository(supabase),
     lawyers: new SupabaseLawyerRepository(supabase, profiles),
     publicLawyerProfiles: new SupabasePublicLawyerProfileRepository(supabase),
     lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase),
