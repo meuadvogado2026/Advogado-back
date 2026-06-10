@@ -1211,6 +1211,58 @@ describe("foundation API", () => {
     expect(publicCities.statusCode).toBe(404);
   });
 
+  it("hides inactive geography records and reactivates them when recreated", async () => {
+    const repos = createMemoryRepositories();
+    const app = await buildApp(repos);
+    const state = await app.inject({
+      method: "POST",
+      url: "/v1/admin/states",
+      headers: ADMIN,
+      payload: { code: "GO", name: "Goias", active: true }
+    });
+    const stateId = state.json().state.id;
+    const city = await app.inject({
+      method: "POST",
+      url: "/v1/admin/cities",
+      headers: ADMIN,
+      payload: { stateId, name: "Goiania", active: true }
+    });
+    const cityId = city.json().city.id;
+
+    await app.inject({ method: "PATCH", url: `/v1/admin/cities/${cityId}`, headers: ADMIN, payload: { active: false } });
+    const citiesWhileInactive = await app.inject({ method: "GET", url: `/v1/admin/cities?stateId=${stateId}`, headers: ADMIN });
+    const reactivatedCity = await app.inject({
+      method: "POST",
+      url: "/v1/admin/cities",
+      headers: ADMIN,
+      payload: { stateId, name: "Goiânia", active: true }
+    });
+
+    await app.inject({ method: "PATCH", url: `/v1/admin/states/${stateId}`, headers: ADMIN, payload: { active: false } });
+    const statesWhileInactive = await app.inject({ method: "GET", url: "/v1/admin/states", headers: ADMIN });
+    const reactivatedState = await app.inject({
+      method: "POST",
+      url: "/v1/admin/states",
+      headers: ADMIN,
+      payload: { code: "GO", name: "Goiás", active: true }
+    });
+    const duplicateActiveState = await app.inject({
+      method: "POST",
+      url: "/v1/admin/states",
+      headers: ADMIN,
+      payload: { code: "GO", name: "Goiás", active: true }
+    });
+    await app.close();
+
+    expect(citiesWhileInactive.json().cities).toEqual([]);
+    expect(reactivatedCity.statusCode).toBe(201);
+    expect(reactivatedCity.json().city).toMatchObject({ id: cityId, name: "Goiânia", active: true });
+    expect(statesWhileInactive.json().states).not.toContainEqual(expect.objectContaining({ id: stateId }));
+    expect(reactivatedState.statusCode).toBe(201);
+    expect(reactivatedState.json().state).toMatchObject({ id: stateId, name: "Goiás", active: true });
+    expect(duplicateActiveState.statusCode).toBe(409);
+  });
+
   it("returns paginated city matches without client coordinates or fallback", async () => {
     const repos = createMemoryRepositories();
     const city = await repos.geographies.createCity({

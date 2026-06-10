@@ -311,7 +311,13 @@ class MemoryGeographyRepository implements GeographyRepository {
   }
   async getState(id: string) { return states.get(id) ?? null; }
   async createState(input: StateCreate) {
-    if (Array.from(states.values()).some((state) => state.code === input.code)) throw new Error("GEO_DUPLICATE");
+    const existing = Array.from(states.values()).find((state) => state.code === input.code);
+    if (existing?.active) throw new Error("GEO_DUPLICATE");
+    if (existing) {
+      const reactivated = { ...existing, name: input.name, active: true, updatedAt: new Date().toISOString() };
+      states.set(existing.id, reactivated);
+      return reactivated;
+    }
     const now = new Date().toISOString();
     const state = { id: crypto.randomUUID(), ...input, createdAt: now, updatedAt: now };
     states.set(state.id, state);
@@ -340,7 +346,13 @@ class MemoryGeographyRepository implements GeographyRepository {
   async createCity(input: CityCreate) {
     const state = states.get(input.stateId);
     if (!state) throw new Error("GEO_STATE_NOT_FOUND");
-    if (Array.from(cities.values()).some((city) => city.stateId === input.stateId && normalizeGeoName(city.name) === normalizeGeoName(input.name))) throw new Error("GEO_DUPLICATE");
+    const existing = Array.from(cities.values()).find((city) => city.stateId === input.stateId && normalizeGeoName(city.name) === normalizeGeoName(input.name));
+    if (existing?.active) throw new Error("GEO_DUPLICATE");
+    if (existing) {
+      const reactivated: CityRecord = { ...existing, name: input.name, active: true, updatedAt: new Date().toISOString() };
+      cities.set(existing.id, reactivated);
+      return reactivated;
+    }
     const now = new Date().toISOString();
     const city: CityRecord = { id: crypto.randomUUID(), stateId: state.id, stateCode: state.code, name: input.name, active: input.active, center: input.center ?? DEFAULT_CITY_CENTER, createdAt: now, updatedAt: now };
     cities.set(city.id, city);

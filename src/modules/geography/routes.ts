@@ -44,7 +44,7 @@ export async function registerGeographyRoutes(app: FastifyInstance, env: AppEnv,
   });
 
   app.get("/admin/states", { preHandler: requireAdmin }, async (request) => {
-    const result = paginated(await repositories.geographies.listStates(), request.query as { page?: string; pageSize?: string });
+    const result = paginated(await repositories.geographies.listStates(true), request.query as { page?: string; pageSize?: string });
     return { states: result.items, pagination: result.pagination };
   });
   app.post("/admin/states", { preHandler: requireAdmin }, async (request, reply) => {
@@ -76,7 +76,7 @@ export async function registerGeographyRoutes(app: FastifyInstance, env: AppEnv,
 
   app.get("/admin/cities", { preHandler: requireAdmin }, async (request) => {
     const query = request.query as { stateId?: string; page?: string; pageSize?: string };
-    const result = paginated(await repositories.geographies.listCities(query.stateId), query);
+    const result = paginated(await repositories.geographies.listCities(query.stateId, true), query);
     return { cities: result.items, pagination: result.pagination };
   });
   app.post("/admin/cities", { preHandler: requireAdmin }, async (request, reply) => {

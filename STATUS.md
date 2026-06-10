@@ -2,6 +2,9 @@
 
 ## Spec 012 - 2026-06-10
 
+- Refinamento do catalogo: `GET /v1/admin/states` e `/v1/admin/cities` retornam
+  somente ativos. `POST` com chave inativa reativa o registro existente; chave ativa
+  duplicada permanece `409`. Teste de regressao incluido; Harness com 83 testes OK.
 - Ajuste de exclusao em 2026-06-10: `DELETE /v1/admin/states/:id` agora bloqueia
   com `409` seguro quando ha cidade ativa ou vinculo, mas permite apagar o estado
   quando restam apenas cidades inativas nao vinculadas, removendo essas cidades antes.

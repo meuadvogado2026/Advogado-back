@@ -6,7 +6,10 @@
 ## Spec 012 - Catalogo E Busca Por Cidade
 
 - `GET /v1/states` e `GET /v1/states/:stateId/cities`: somente ativos.
-- CRUD `/v1/admin/states` e `/v1/admin/cities`: role `admin`; vinculo bloqueia delete; cidade nao exige centroide na UI.
+- CRUD `/v1/admin/states` e `/v1/admin/cities`: role `admin`; listagens retornam
+  somente ativos; vinculo bloqueia delete; cidade nao exige centroide na UI.
+- `POST` de estado/cidade reativa o registro existente quando a chave unica esta
+  inativa. Duplicata ativa continua retornando `409`.
 - `POST/PATCH /v1/admin/lawyers`: aceita estado/cidade, coordenada manual e disponibilidade.
 - `POST /v1/match/by-city`: autenticado, `pageSize=5`, sem coordenada do cliente, sem metrica de distancia, `algorithmVersion=city-list-v1`.
 - `POST /v1/match` permanece com o contrato GPS existente.

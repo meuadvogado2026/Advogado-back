@@ -36,6 +36,9 @@ function assertSupabaseOk(error: { message: string } | null, context: string) {
   }
 }
 
+const normalizeGeoName = (value: string) =>
+  value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 const PROFILE_COLUMNS =
   "id, role, name, email, phone, avatar_url, cover_url, blocked_at, must_change_password, access_invited_at, first_login_completed_at, created_at, updated_at";
 
@@ -268,6 +271,18 @@ class SupabaseGeographyRepository implements GeographyRepository {
   }
   async getState(id: string) { return (await this.listStates()).find((state) => state.id === id) ?? null; }
   async createState(input: StateCreate) {
+    const { data: existing, error: existingError } = await this.supabase
+      .from("states")
+      .select("id, active")
+      .eq("code", input.code)
+      .maybeSingle();
+    assertSupabaseOk(existingError, "states.findDuplicate");
+    if (existing?.active) throw new Error("GEO_DUPLICATE");
+    if (existing) {
+      const reactivated = await this.updateState(existing.id, { name: input.name, active: true });
+      if (!reactivated) throw new Error("states.reactivate: registro nao encontrado");
+      return reactivated;
+    }
     const { data, error } = await this.supabase.from("states").insert({ code: input.code, name: input.name, active: input.active }).select("id, code, name, active, created_at, updated_at").single();
     if ((error as any)?.code === "23505") throw new Error("GEO_DUPLICATE");
     assertSupabaseOk(error, "states.create");
@@ -299,7 +314,21 @@ class SupabaseGeographyRepository implements GeographyRepository {
   }
   async getCity(id: string) { return (await this.listCities()).find((city) => city.id === id) ?? null; }
   async createCity(input: CityCreate) {
-    const payload = { state_id: input.stateId, name: input.name, normalized_name: input.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(), active: input.active, center_location: toOfficeLocation(input.center ?? { lat: -15.793889, lng: -47.882778 }) };
+    const normalizedName = normalizeGeoName(input.name);
+    const { data: existing, error: existingError } = await this.supabase
+      .from("cities")
+      .select("id, active")
+      .eq("state_id", input.stateId)
+      .eq("normalized_name", normalizedName)
+      .maybeSingle();
+    assertSupabaseOk(existingError, "cities.findDuplicate");
+    if (existing?.active) throw new Error("GEO_DUPLICATE");
+    if (existing) {
+      const reactivated = await this.updateCity(existing.id, { name: input.name, active: true });
+      if (!reactivated) throw new Error("cities.reactivate: registro nao encontrado");
+      return reactivated;
+    }
+    const payload = { state_id: input.stateId, name: input.name, normalized_name: normalizedName, active: input.active, center_location: toOfficeLocation(input.center ?? { lat: -15.793889, lng: -47.882778 }) };
     const { data, error } = await this.supabase.from("cities").insert(payload).select("id").single();
     if ((error as any)?.code === "23505") throw new Error("GEO_DUPLICATE");
     assertSupabaseOk(error, "cities.create");
@@ -308,7 +337,7 @@ class SupabaseGeographyRepository implements GeographyRepository {
   async updateCity(id: string, patch: CityPatch) {
     const payload: Record<string, unknown> = {};
     if (patch.stateId) payload.state_id = patch.stateId;
-    if (patch.name) { payload.name = patch.name; payload.normalized_name = patch.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+    if (patch.name) { payload.name = patch.name; payload.normalized_name = normalizeGeoName(patch.name); }
     if (patch.active !== undefined) payload.active = patch.active;
     if (patch.center) payload.center_location = toOfficeLocation(patch.center);
     const { data, error } = await this.supabase.from("cities").update(payload).eq("id", id).select("id").maybeSingle();

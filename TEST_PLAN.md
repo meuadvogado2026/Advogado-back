@@ -2,6 +2,8 @@
 
 ## Spec 012
 
+- Cobrir ocultacao de localidades inativas nas listagens admin.
+- Cobrir reativacao pelo `POST` preservando o ID e conflito para duplicata ativa.
 - Roles, catalogo, duplicidade, exclusao vinculada e cidade/estado incorretos.
 - Disponibilidade, legado sem cidade, deduplicacao, paginacao 5 e allowlist.
 - Regressao de `/v1/match`; `EXPLAIN` real pendente ate migration controlada.
