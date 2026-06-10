@@ -294,7 +294,7 @@ class SupabaseGeographyRepository implements GeographyRepository {
   }
   async getCity(id: string) { return (await this.listCities()).find((city) => city.id === id) ?? null; }
   async createCity(input: CityCreate) {
-    const payload = { state_id: input.stateId, name: input.name, normalized_name: input.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(), active: input.active, center_location: toOfficeLocation(input.center) };
+    const payload = { state_id: input.stateId, name: input.name, normalized_name: input.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(), active: input.active, center_location: toOfficeLocation(input.center ?? { lat: -15.793889, lng: -47.882778 }) };
     const { data, error } = await this.supabase.from("cities").insert(payload).select("id").single();
     if ((error as any)?.code === "23505") throw new Error("GEO_DUPLICATE");
     assertSupabaseOk(error, "cities.create");
@@ -866,8 +866,7 @@ class SupabaseMatchRepository implements MatchRepository {
         const visual = visuals.get(lawyerProfile.get(row.lawyer_profile_id));
         return {
           id: row.lawyer_profile_id, name: row.name, whatsapp: row.whatsapp, city: row.city_name, state: row.state_code,
-          areaIds: row.area_ids ?? [], avatarUrl: visual?.avatar_url ?? null, coverUrl: visual?.cover_url ?? null,
-          distanceFromCityCenterKm: Number(row.distance_from_city_center_km)
+          areaIds: row.area_ids ?? [], avatarUrl: visual?.avatar_url ?? null, coverUrl: visual?.cover_url ?? null
         };
       })
     };

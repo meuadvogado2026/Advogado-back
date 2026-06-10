@@ -301,7 +301,7 @@ export type NearestLawyerResult = {
 export interface MatchRepository {
   findNearest(input: NearestLawyerInput): Promise<NearestLawyerResult>;
   findByCity(input: { stateId: string; cityId: string; areaIds: string[]; page: number; pageSize: 5 }): Promise<{
-    lawyers: Array<MatchedLawyer & { distanceFromCityCenterKm: number }>;
+    lawyers: MatchedLawyer[];
     total: number;
   }>;
 }

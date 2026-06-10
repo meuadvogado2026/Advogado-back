@@ -2,9 +2,10 @@
 
 ## Spec 012 - 2026-06-10
 
-Migration `0011`, catalogo, repositories, vinculo/disponibilidade e
-`POST /v1/match/by-city` implementados. Harness passou com 82 testes. Migration remota,
-plano real da query e smoke autenticado permanecem pendentes.
+Migration `0011` criou o catalogo; migration `0012` simplifica a busca por cidade,
+semeia DF/regioes administrativas e remove a metrica de distancia do contrato publico.
+Catalogo, vinculo/disponibilidade e `POST /v1/match/by-city` implementados. Smoke
+autenticado/remoto permanece pendente.
 
 **Ultima atualizacao:** 2026-06-10
 **Fase:** BACKEND / ADMIN OPERACIONAL PRODUCAO / SPEC010 PUBLICADA

@@ -82,7 +82,7 @@ export const cityCreateSchema = z.object({
   stateId: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
   active: z.boolean().default(true),
-  center: officeManualLocationSchema
+  center: officeManualLocationSchema.optional()
 });
 export const cityPatchSchema = cityCreateSchema.partial();
 

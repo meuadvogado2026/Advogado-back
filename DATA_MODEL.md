@@ -5,10 +5,13 @@
 
 ## Spec 012
 
-- `states` e `cities`, com centroide PostGIS e `unique(state_id, normalized_name)`.
+- `states` e `cities`, com `unique(state_id, normalized_name)`. O campo tecnico
+  `cities.center_location` permanece por compatibilidade com a migration `0011`, mas
+  nao e editado no admin nem usado como metrica da busca por cidade.
 - `lawyer_profiles.service_city_id` nullable e FK `on delete restrict`.
 - `lawyer_profiles.available_for_matches` default `true`, aplicado aos dois matches.
-- Migration aditiva: `src/db/migrations/0011_geographic_catalog_city_match.sql`.
+- Migrations aditivas: `0011_geographic_catalog_city_match.sql` e
+  `0012_simplify_city_catalog_and_seed_df.sql` (DF + regioes administrativas).
 
 ## Extensoes Recomendadas
 

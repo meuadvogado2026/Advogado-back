@@ -1194,7 +1194,7 @@ describe("foundation API", () => {
     const app = await buildApp(repos);
     const state = await app.inject({ method: "POST", url: "/v1/admin/states", headers: ADMIN, payload: { code: "SP", name: "Sao Paulo", active: true } });
     const stateId = state.json().state.id;
-    const cityPayload = { stateId, name: "Campinas", active: true, center: { lat: -22.9056, lng: -47.0608 } };
+    const cityPayload = { stateId, name: "Campinas", active: true };
     const city = await app.inject({ method: "POST", url: "/v1/admin/cities", headers: ADMIN, payload: cityPayload });
     const duplicate = await app.inject({ method: "POST", url: "/v1/admin/cities", headers: ADMIN, payload: cityPayload });
     const deleteLinkedState = await app.inject({ method: "DELETE", url: `/v1/admin/states/${stateId}`, headers: ADMIN });
@@ -1213,8 +1213,7 @@ describe("foundation API", () => {
     const city = await repos.geographies.createCity({
       stateId: SERVICE_STATE_ID,
       name: `Cidade Match ${Date.now()}`,
-      active: true,
-      center: { lat: -15.793889, lng: -47.882778 }
+      active: true
     });
     await repos.lawyers.create(
       { ...draftWithoutCoordinate({ name: "Dra. Cidade", email: "cidade@example.test", status: "approved" }), serviceCityId: city.id, availableForMatches: true },
@@ -1238,7 +1237,7 @@ describe("foundation API", () => {
       status: "matched",
       lawyers: [{ name: "Dra. Cidade", state: "DF" }],
       pagination: { page: 1, pageSize: 5, total: 1, totalPages: 1 },
-      algorithmVersion: "city-nearest-v1"
+      algorithmVersion: "city-list-v1"
     });
     expect(response.json().lawyers[0]).not.toHaveProperty("officeCep");
     expect(response.json().lawyers[0]).not.toHaveProperty("lat");

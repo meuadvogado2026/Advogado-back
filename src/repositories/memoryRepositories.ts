@@ -30,10 +30,11 @@ const states = new Map<string, import("./types.js").StateRecord>();
 const cities = new Map<string, CityRecord>();
 const DEFAULT_STATE_ID = "10000000-0000-4000-8000-000000000001";
 const DEFAULT_CITY_ID = "20000000-0000-4000-8000-000000000001";
+const DEFAULT_CITY_CENTER = { lat: -15.793889, lng: -47.882778 };
 if (states.size === 0) {
   const now = new Date().toISOString();
   states.set(DEFAULT_STATE_ID, { id: DEFAULT_STATE_ID, code: "DF", name: "Distrito Federal", active: true, createdAt: now, updatedAt: now });
-  cities.set(DEFAULT_CITY_ID, { id: DEFAULT_CITY_ID, stateId: DEFAULT_STATE_ID, stateCode: "DF", name: "Brasilia", active: true, center: { lat: -15.793889, lng: -47.882778 }, createdAt: now, updatedAt: now });
+  cities.set(DEFAULT_CITY_ID, { id: DEFAULT_CITY_ID, stateId: DEFAULT_STATE_ID, stateCode: "DF", name: "Brasilia", active: true, center: DEFAULT_CITY_CENTER, createdAt: now, updatedAt: now });
 }
 const prayerRequests: Array<{
   id: string;
@@ -338,7 +339,7 @@ class MemoryGeographyRepository implements GeographyRepository {
     if (!state) throw new Error("GEO_STATE_NOT_FOUND");
     if (Array.from(cities.values()).some((city) => city.stateId === input.stateId && normalizeGeoName(city.name) === normalizeGeoName(input.name))) throw new Error("GEO_DUPLICATE");
     const now = new Date().toISOString();
-    const city: CityRecord = { id: crypto.randomUUID(), stateId: state.id, stateCode: state.code, name: input.name, active: input.active, center: input.center, createdAt: now, updatedAt: now };
+    const city: CityRecord = { id: crypto.randomUUID(), stateId: state.id, stateCode: state.code, name: input.name, active: input.active, center: input.center ?? DEFAULT_CITY_CENTER, createdAt: now, updatedAt: now };
     cities.set(city.id, city);
     return city;
   }
@@ -626,12 +627,12 @@ class MemoryMatchRepository implements MatchRepository {
       .filter((lawyer) => profiles.get(lawyer.profileId)?.blockedAt == null)
       .filter((lawyer) => lawyer.officeLocationStatus === "validated")
       .filter((lawyer) => [lawyer.mainAreaId, ...lawyer.secondaryAreaIds].some((area) => input.areaIds.includes(area)))
-      .map((lawyer) => ({ lawyer, distance: roundKm(haversineKm(city.center.lat, city.center.lng, lawyer.officeLat!, lawyer.officeLng!)) }))
-      .sort((a, b) => a.distance - b.distance || a.lawyer.id.localeCompare(b.lawyer.id));
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .map((lawyer) => ({ lawyer }));
     const start = (input.page - 1) * input.pageSize;
     return {
       total: candidates.length,
-      lawyers: candidates.slice(start, start + input.pageSize).map(({ lawyer, distance }) => ({
+      lawyers: candidates.slice(start, start + input.pageSize).map(({ lawyer }) => ({
         id: lawyer.id,
         name: lawyer.name,
         whatsapp: lawyer.whatsapp,
@@ -639,8 +640,7 @@ class MemoryMatchRepository implements MatchRepository {
         state: city.stateCode,
         areaIds: [lawyer.mainAreaId, ...lawyer.secondaryAreaIds],
         avatarUrl: lawyer.avatarUrl ?? null,
-        coverUrl: lawyer.coverUrl ?? null,
-        distanceFromCityCenterKm: distance
+        coverUrl: lawyer.coverUrl ?? null
       }))
     };
   }

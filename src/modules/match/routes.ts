@@ -88,7 +88,7 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
       status: result.total > 0 ? "matched" : "empty",
       lawyers: result.lawyers,
       pagination: { page: parsed.data.page, pageSize: parsed.data.pageSize, total: result.total, totalPages },
-      algorithmVersion: "city-nearest-v1"
+      algorithmVersion: "city-list-v1"
     };
   });
 }
