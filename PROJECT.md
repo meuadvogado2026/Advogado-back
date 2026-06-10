@@ -1,4 +1,4 @@
-# Backend Project - Meu Advogado 2.0
+# Backend Project - Advogado 2.0
 
 **Fase:** backend local com admin operacional ampliado / aguardando migration 0004 para producao
 **Hospedagem alvo:** Railway  
@@ -32,7 +32,7 @@ Construir a API que centraliza regra de negocio, autorizacao, match por localiza
 
 - `../DOCUMENTACAO_TECNICA.md`
 - `../DECISIONS.md`
-- `../.codex/SPEC_Specs/SPEC_MeuAdvogado20_SDD.md`
+- `../.codex/SPEC_Specs/SPEC_Advogado20_SDD.md`
 
 ## Scaffold Atual
 

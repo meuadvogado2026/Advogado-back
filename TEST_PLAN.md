@@ -1,4 +1,4 @@
-# Backend Test Plan - Meu Advogado 2.0
+# Backend Test Plan - Advogado 2.0
 
 ## Spec 012
 

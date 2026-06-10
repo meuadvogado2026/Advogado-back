@@ -33,7 +33,7 @@ describe("foundation API", () => {
     await app.close();
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ status: "ok", service: "meu-advogado-20-back" });
+    expect(response.json()).toMatchObject({ status: "ok", service: "advogado-20-back" });
   });
 
   it("always allows the published Vercel admin origin even when CORS_ORIGINS is overridden", async () => {

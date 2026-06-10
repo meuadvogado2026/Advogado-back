@@ -1,4 +1,4 @@
--- Meu Advogado 2.0 - seed de fixtures de match (coordenadas fixas) - spec 001
+-- Advogado 2.0 - seed de fixtures de match (coordenadas fixas) - spec 001
 -- Decisao: semear coordenadas fixas agora, sem depender da UI admin nem do
 -- geocoding real (spec 002). Aplicar manualmente no Supabase SQL Editor.
 -- Idempotente: pode rodar mais de uma vez sem duplicar.

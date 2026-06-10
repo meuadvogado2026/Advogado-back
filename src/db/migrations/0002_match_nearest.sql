@@ -1,4 +1,4 @@
--- Meu Advogado 2.0 - match real geoespacial (spec 001)
+-- Advogado 2.0 - match real geoespacial (spec 001)
 -- Funcao chamada via supabase.rpc("match_nearest_lawyer", ...).
 -- Calcula o advogado aprovado mais proximo, compativel com as areas pedidas,
 -- dentro do raio maximo. Distancia em km calculada no banco com PostGIS.

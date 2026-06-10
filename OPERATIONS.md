@@ -1,4 +1,4 @@
-# Backend Operations - Meu Advogado 2.0
+# Backend Operations - Advogado 2.0
 
 **Hospedagem alvo:** Railway
 
@@ -49,7 +49,7 @@ Aplicacao remota exige comando explicito, confirmacao explicita e `psql` disponi
 
 - `npm run migration:apply`
 - `APPLY_REMOTE_MIGRATIONS=true`
-- `MIGRATION_CONFIRMATION=APPLY_MEU_ADVOGADO_20_FOUNDATION`
+- `MIGRATION_CONFIRMATION=APPLY_ADVOGADO_20_FOUNDATION`
 - `SUPABASE_DB_URL` configurado somente no ambiente seguro.
 
 ## Seeds De Teste

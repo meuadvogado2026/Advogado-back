@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Meu Advogado 2.0 API
+  title: Advogado 2.0 API
   version: 0.7.0-mobile-signup-ux
 servers:
   - url: http://localhost:3333

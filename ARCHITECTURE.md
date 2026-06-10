@@ -1,4 +1,4 @@
-# Backend Architecture - Meu Advogado 2.0
+# Backend Architecture - Advogado 2.0
 
 ## Camadas
 

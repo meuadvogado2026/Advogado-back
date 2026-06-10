@@ -1,4 +1,4 @@
-import type { AppEnv } from "../../config/env.js";
+﻿import type { AppEnv } from "../../config/env.js";
 
 export type CepAddress = {
   cep: string;
@@ -235,7 +235,7 @@ export class NominatimGeocodingProvider implements GeocodingProvider {
   constructor(options: NominatimProviderOptions) {
     this.brasilApiBaseUrl = options.brasilApiBaseUrl.replace(/\/$/, "");
     this.nominatimBaseUrl = options.nominatimBaseUrl.replace(/\/$/, "");
-    this.userAgent = options.userAgent ?? "MeuAdvogado20/1.0 (contato: suporte@ent.app.br)";
+    this.userAgent = options.userAgent ?? "Advogado20/1.0 (contato: suporte@ent.app.br)";
     this.timeoutMs = options.timeoutMs ?? 5000;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.cepCache = new TtlCache<CepAddress>(options.cepTtlMs ?? 24 * 60 * 60 * 1000);

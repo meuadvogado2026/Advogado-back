@@ -1,4 +1,4 @@
-# Backend Data Model - Meu Advogado 2.0
+# Backend Data Model - Advogado 2.0
 
 **Banco:** Supabase Postgres novo  
 **Estado:** migrations versionadas / spec 007 LGPD implementada com ressalvas

@@ -1,4 +1,4 @@
--- Meu Advogado 2.0 - metadados de geocoding e match com distancia confiavel
+-- Advogado 2.0 - metadados de geocoding e match com distancia confiavel
 -- Aditiva: campos novos podem ficar nulos; coordenadas sem metadado confiavel
 -- deixam de ser elegiveis para distancia numerica no match.
 

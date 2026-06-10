@@ -1,4 +1,4 @@
-# Backend Security And Privacy - Meu Advogado 2.0
+# Backend Security And Privacy - Advogado 2.0
 
 ## Principios
 
@@ -70,7 +70,7 @@ deve limpar os pedidos neutros criados no teste.
 
 ## Migration Controlada
 
-`npm run migration:check` valida a migration sem aplicar remotamente, mesmo se a env tiver flags de aplicacao. Aplicacao remota so e tentada com `npm run migration:apply`, `APPLY_REMOTE_MIGRATIONS=true`, `SUPABASE_DB_URL` configurado e `MIGRATION_CONFIRMATION=APPLY_MEU_ADVOGADO_20_FOUNDATION`.
+`npm run migration:check` valida a migration sem aplicar remotamente, mesmo se a env tiver flags de aplicacao. Aplicacao remota so e tentada com `npm run migration:apply`, `APPLY_REMOTE_MIGRATIONS=true`, `SUPABASE_DB_URL` configurado e `MIGRATION_CONFIRMATION=APPLY_ADVOGADO_20_FOUNDATION`.
 
 ## Env
 

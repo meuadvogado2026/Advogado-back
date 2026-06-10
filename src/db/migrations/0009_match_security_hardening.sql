@@ -1,4 +1,4 @@
--- Meu Advogado 2.0 - hardening de RPC e match
+-- Advogado 2.0 - hardening de RPC e match
 -- Aditiva: restringe execucao da RPC de convite, filtra perfis bloqueados no
 -- match e usa pre-filtro geoespacial para aproveitar o indice GiST.
 

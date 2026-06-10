@@ -129,7 +129,7 @@ if (!applyRequested || env.APPLY_REMOTE_MIGRATIONS !== "true") {
         seeds: seedFiles.map((file) => `${seedsDir}/${file}`),
         gaps: [
           "Seeds nao sao aplicados automaticamente; rodar manualmente no Supabase SQL Editor (ex.: 001_match_fixtures.sql).",
-          "Aplicacao remota exige npm run migration:apply, APPLY_REMOTE_MIGRATIONS=true, SUPABASE_DB_URL e MIGRATION_CONFIRMATION=APPLY_MEU_ADVOGADO_20_FOUNDATION."
+          "Aplicacao remota exige npm run migration:apply, APPLY_REMOTE_MIGRATIONS=true, SUPABASE_DB_URL e MIGRATION_CONFIRMATION=APPLY_ADVOGADO_20_FOUNDATION."
         ]
       },
       null,
@@ -139,7 +139,7 @@ if (!applyRequested || env.APPLY_REMOTE_MIGRATIONS !== "true") {
   process.exit(0);
 }
 
-if (!env.SUPABASE_DB_URL || env.MIGRATION_CONFIRMATION !== "APPLY_MEU_ADVOGADO_20_FOUNDATION") {
+if (!env.SUPABASE_DB_URL || env.MIGRATION_CONFIRMATION !== "APPLY_ADVOGADO_20_FOUNDATION") {
   console.error("Aplicacao remota bloqueada: faltam SUPABASE_DB_URL ou confirmacao textual exata.");
   process.exit(1);
 }

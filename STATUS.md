@@ -1,4 +1,4 @@
-# Backend Status - Meu Advogado 2.0
+# Backend Status - Advogado 2.0
 
 ## Spec 012 - 2026-06-10
 
@@ -70,7 +70,7 @@ autenticado/remoto permanece pendente.
 - [x] `lawyer_profiles` minimo aprovado criado para o usuario advogado de teste.
 - [x] Smoke JWT real criado e executado com `npm run auth:smoke`.
 - [x] Admin real validado com `200` em rota admin; advogado e cliente validados com `403`.
-- [x] Ambiente backend passou a ser governado pela `.codex/` unica da raiz; copia local `Meu Advogado 2.0 - back/.codex` removida.
+- [x] Ambiente backend passou a ser governado pela `.codex/` unica da raiz; copia local `Advogado 2.0 - back/.codex` removida.
 - [x] Spec 006: `GET /v1/me` implementado para retornar identidade/role segura (`id`, `email`, `role`) sem token/service role/payload sensivel.
 - [x] `POST /v1/auth/signup-client` implementado e publicado para cadastro publico de cliente: cria Supabase Auth via service role server-side, cria `profiles.role=client` com mesmo id e responde sem senha/token/segredo. Em modo memory, contrato e smoke passam sem Supabase real; em producao Railway, smoke real passou com cadastro descartavel, login, `/v1/me` e cleanup.
 - [x] Spec 007: mecanismo backend de retencao de `match_events` implementado com comando `npm run retention:match-events`, dry-run padrao, retencao de 90 dias e apply bloqueado por confirmacao explicita.

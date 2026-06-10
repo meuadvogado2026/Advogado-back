@@ -1,4 +1,4 @@
--- Meu Advogado 2.0 - foundation migration draft
+-- Advogado 2.0 - foundation migration draft
 -- Status: versionado, NAO aplicado remotamente neste ciclo.
 
 create extension if not exists pgcrypto;

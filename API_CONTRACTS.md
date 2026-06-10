@@ -1,4 +1,4 @@
-# Backend API Contracts - Meu Advogado 2.0
+# Backend API Contracts - Advogado 2.0
 
 **Estado:** auth/roles versionado em `openapi.yaml`  
 **Versao:** `/v1`
