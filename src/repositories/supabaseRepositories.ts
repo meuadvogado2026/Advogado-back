@@ -279,8 +279,13 @@ class SupabaseGeographyRepository implements GeographyRepository {
     return data ? { id: data.id, code: data.code, name: data.name, active: data.active, createdAt: data.created_at, updatedAt: data.updated_at } : null;
   }
   async deleteState(id: string) {
+    const activeCities = await this.listCities(id, true);
+    if (activeCities.length > 0) return "linked" as const;
+    const { error: inactiveCitiesError } = await this.supabase.from("cities").delete().eq("state_id", id).eq("active", false);
+    if ((inactiveCitiesError as any)?.code === "23503") return "linked" as const;
+    assertSupabaseOk(inactiveCitiesError, "states.deleteInactiveCities");
     const { error, count } = await this.supabase.from("states").delete({ count: "exact" }).eq("id", id);
-    if ((error as any)?.code === "23503") return "linked" as const;
+    if ((error as any)?.code === "23503" || (error as any)?.code === "2BP01") return "linked" as const;
     assertSupabaseOk(error, "states.delete");
     return count ? "deleted" as const : "not_found" as const;
   }

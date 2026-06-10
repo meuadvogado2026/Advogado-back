@@ -68,7 +68,7 @@ export async function registerGeographyRoutes(app: FastifyInstance, env: AppEnv,
   });
   app.delete("/admin/states/:id", { preHandler: requireAdmin }, async (request, reply) => {
     const result = await repositories.geographies.deleteState((request.params as { id: string }).id);
-    if (result === "linked") return reply.code(409).send(apiError("CONFLICT", "Estado vinculado deve ser desativado."));
+    if (result === "linked") return reply.code(409).send(apiError("CONFLICT", "Estado possui cidades ativas ou registros vinculados."));
     if (result === "not_found") return reply.code(404).send(apiError("NOT_FOUND", "Estado nao encontrado."));
     await audit(request, "geography.state.deleted", "state", (request.params as { id: string }).id);
     return reply.code(204).send();

@@ -326,7 +326,10 @@ class MemoryGeographyRepository implements GeographyRepository {
   }
   async deleteState(id: string) {
     if (!states.has(id)) return "not_found" as const;
-    if (Array.from(cities.values()).some((city) => city.stateId === id)) return "linked" as const;
+    const stateCities = Array.from(cities.values()).filter((city) => city.stateId === id);
+    if (stateCities.some((city) => city.active)) return "linked" as const;
+    if (stateCities.some((city) => Array.from(lawyers.values()).some((lawyer) => lawyer.serviceCityId === city.id))) return "linked" as const;
+    for (const city of stateCities) cities.delete(city.id);
     states.delete(id);
     return "deleted" as const;
   }

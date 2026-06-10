@@ -2,6 +2,11 @@
 
 ## Spec 012 - 2026-06-10
 
+- Ajuste de exclusao em 2026-06-10: `DELETE /v1/admin/states/:id` agora bloqueia
+  com `409` seguro quando ha cidade ativa ou vinculo, mas permite apagar o estado
+  quando restam apenas cidades inativas nao vinculadas, removendo essas cidades antes.
+  Gates backend: `tests/app.test.ts`, typecheck e harness OK.
+
 Migration `0011` criou o catalogo; migration `0012` simplifica a busca por cidade,
 semeia DF/regioes administrativas e remove a metrica de distancia do contrato publico.
 Catalogo, vinculo/disponibilidade e `POST /v1/match/by-city` implementados. Smoke

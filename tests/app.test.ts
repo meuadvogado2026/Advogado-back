@@ -1198,6 +1198,8 @@ describe("foundation API", () => {
     const city = await app.inject({ method: "POST", url: "/v1/admin/cities", headers: ADMIN, payload: cityPayload });
     const duplicate = await app.inject({ method: "POST", url: "/v1/admin/cities", headers: ADMIN, payload: cityPayload });
     const deleteLinkedState = await app.inject({ method: "DELETE", url: `/v1/admin/states/${stateId}`, headers: ADMIN });
+    await app.inject({ method: "PATCH", url: `/v1/admin/cities/${city.json().city.id}`, headers: ADMIN, payload: { active: false } });
+    const deleteInactiveCityState = await app.inject({ method: "DELETE", url: `/v1/admin/states/${stateId}`, headers: ADMIN });
     const publicCities = await app.inject({ method: "GET", url: `/v1/states/${stateId}/cities` });
     await app.close();
 
@@ -1205,7 +1207,8 @@ describe("foundation API", () => {
     expect(city.statusCode).toBe(201);
     expect(duplicate.statusCode).toBe(409);
     expect(deleteLinkedState.statusCode).toBe(409);
-    expect(publicCities.json().cities).toHaveLength(1);
+    expect(deleteInactiveCityState.statusCode).toBe(204);
+    expect(publicCities.statusCode).toBe(404);
   });
 
   it("returns paginated city matches without client coordinates or fallback", async () => {
