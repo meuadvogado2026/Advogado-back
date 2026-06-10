@@ -104,7 +104,7 @@ const areas = await call("/v1/areas");
 const list = (areas.body as { areas?: Array<{ id: string; slug: string }> })?.areas ?? [];
 const civil = list.find((a) => a.slug === "civil");
 const uncovered = list.find((a) => !COVERED.has(a.slug));
-mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && list.length === 6 && Boolean(civil));
+mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && list.length >= 8 && Boolean(civil));
 
 // match matched
 let matchedLawyerId: string | undefined;
