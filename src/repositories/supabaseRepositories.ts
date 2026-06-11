@@ -262,11 +262,66 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 class SupabaseGeographyRepository implements GeographyRepository {
   constructor(private readonly supabase: SupabaseClient) {}
+  private async resolveSpecialtyIds(areaIds: string[] = []) {
+    if (areaIds.length === 0) return [];
+    const uuidIds = areaIds.filter((areaId) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(areaId));
+    const slugs = areaIds.filter((areaId) => !uuidIds.includes(areaId));
+    const resolved = new Set(uuidIds);
+    if (slugs.length > 0) {
+      const { data, error } = await this.supabase
+        .from("legal_specialties")
+        .select("id")
+        .in("slug", slugs);
+      assertSupabaseOk(error, "geography.resolveSpecialtySlugs");
+      for (const row of data ?? []) resolved.add((row as { id: string }).id);
+    }
+    return [...resolved];
+  }
+
+  private async eligibleServiceCityIds(areaIds: string[] = []) {
+    const specialtyIds = await this.resolveSpecialtyIds(areaIds);
+    let query = this.supabase
+      .from("lawyer_profiles")
+      .select("service_city_id, profiles!inner(blocked_at), lawyer_specialties!inner(specialty_id)")
+      .eq("status", "approved")
+      .eq("available_for_matches", true)
+      .not("service_city_id", "is", null)
+      .not("office_location", "is", null)
+      .eq("office_geocode_confidence", "high")
+      .in("office_geocode_precision", ["street", "manual"])
+      .is("profiles.blocked_at", null);
+    if (areaIds.length > 0 && specialtyIds.length === 0) return [];
+    if (specialtyIds.length > 0) query = query.in("lawyer_specialties.specialty_id", specialtyIds);
+    const { data, error } = await query;
+    assertSupabaseOk(error, "geography.eligibleServiceCityIds");
+    return [...new Set((data ?? []).map((row: any) => row.service_city_id).filter(Boolean))] as string[];
+  }
+
   async listStates(activeOnly = false) {
     let query = this.supabase.from("states").select("id, code, name, active, created_at, updated_at").order("name");
     if (activeOnly) query = query.eq("active", true);
     const { data, error } = await query;
     assertSupabaseOk(error, "states.list");
+    return (data ?? []).map((row: any) => ({ id: row.id, code: row.code, name: row.name, active: row.active, createdAt: row.created_at, updatedAt: row.updated_at }));
+  }
+  async listStatesWithAvailableLawyers(areaIds: string[] = []) {
+    const cityIds = await this.eligibleServiceCityIds(areaIds);
+    if (cityIds.length === 0) return [];
+    const { data: citiesData, error: citiesError } = await this.supabase
+      .from("cities")
+      .select("state_id")
+      .in("id", cityIds)
+      .eq("active", true);
+    assertSupabaseOk(citiesError, "states.listWithLawyers.cities");
+    const stateIds = [...new Set((citiesData ?? []).map((row: any) => row.state_id).filter(Boolean))];
+    if (stateIds.length === 0) return [];
+    const { data, error } = await this.supabase
+      .from("states")
+      .select("id, code, name, active, created_at, updated_at")
+      .in("id", stateIds)
+      .eq("active", true)
+      .order("name");
+    assertSupabaseOk(error, "states.listWithLawyers");
     return (data ?? []).map((row: any) => ({ id: row.id, code: row.code, name: row.name, active: row.active, createdAt: row.created_at, updatedAt: row.updated_at }));
   }
   async getState(id: string) { return (await this.listStates()).find((state) => state.id === id) ?? null; }
@@ -310,6 +365,20 @@ class SupabaseGeographyRepository implements GeographyRepository {
     if (activeOnly) query = query.eq("active", true);
     const { data, error } = await query;
     assertSupabaseOk(error, "cities.list");
+    return (data ?? []).map((row: any) => ({ id: row.id, stateId: row.state_id, stateCode: Array.isArray(row.states) ? row.states[0]?.code : row.states?.code, name: row.name, active: row.active, center: { lat: Number(row.center_location?.coordinates?.[1] ?? 0), lng: Number(row.center_location?.coordinates?.[0] ?? 0) }, createdAt: row.created_at, updatedAt: row.updated_at }));
+  }
+  async listCitiesWithAvailableLawyers(stateId: string, areaIds: string[] = []) {
+    const cityIds = await this.eligibleServiceCityIds(areaIds);
+    if (cityIds.length === 0) return [];
+    const { data, error } = await this.supabase
+      .from("cities")
+      .select("id, state_id, name, active, center_location, created_at, updated_at, states!inner(code, active)")
+      .eq("state_id", stateId)
+      .eq("active", true)
+      .eq("states.active", true)
+      .in("id", cityIds)
+      .order("name");
+    assertSupabaseOk(error, "cities.listWithLawyers");
     return (data ?? []).map((row: any) => ({ id: row.id, stateId: row.state_id, stateCode: Array.isArray(row.states) ? row.states[0]?.code : row.states?.code, name: row.name, active: row.active, center: { lat: Number(row.center_location?.coordinates?.[1] ?? 0), lng: Number(row.center_location?.coordinates?.[0] ?? 0) }, createdAt: row.created_at, updatedAt: row.updated_at }));
   }
   async getCity(id: string) { return (await this.listCities()).find((city) => city.id === id) ?? null; }

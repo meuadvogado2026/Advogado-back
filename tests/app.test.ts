@@ -1263,6 +1263,56 @@ describe("foundation API", () => {
     expect(duplicateActiveState.statusCode).toBe(409);
   });
 
+  it("lists public states and cities only when they have eligible lawyers for the selected area", async () => {
+    const repos = createMemoryRepositories();
+    const emptyState = await repos.geographies.createState({ code: "MT", name: "Mato Grosso", active: true });
+    await repos.geographies.createCity({ stateId: emptyState.id, name: "Cuiaba", active: true });
+    const emptyCity = await repos.geographies.createCity({
+      stateId: SERVICE_STATE_ID,
+      name: `Cidade Sem Advogado ${Date.now()}`,
+      active: true
+    });
+    const laborCity = await repos.geographies.createCity({
+      stateId: SERVICE_STATE_ID,
+      name: `Cidade Trabalhista ${Date.now()}`,
+      active: true
+    });
+
+    await repos.lawyers.create(
+      { ...draftWithoutCoordinate({ name: "Dra. Civil Cidade", email: `civil-${Date.now()}@example.test`, status: "approved" }), serviceCityId: SERVICE_CITY_ID, availableForMatches: true },
+      {
+        address: { city: "Brasilia", state: "DF" },
+        coordinates: { lat: -15.8, lng: -47.9 },
+        geocode: { provider: "manual", precision: "manual", confidence: "high" }
+      }
+    );
+    await repos.lawyers.create(
+      { ...draftWithoutCoordinate({ name: "Dra. Trabalhista Cidade", email: `trab-${Date.now()}@example.test`, mainAreaId: "trabalhista", status: "approved" }), serviceCityId: laborCity.id, availableForMatches: true },
+      {
+        address: { city: "Brasilia", state: "DF" },
+        coordinates: { lat: -15.81, lng: -47.91 },
+        geocode: { provider: "manual", precision: "manual", confidence: "high" }
+      }
+    );
+
+    const app = await buildApp(repos);
+    const states = await app.inject({ method: "GET", url: "/v1/states?areaIds=civil" });
+    const cities = await app.inject({ method: "GET", url: `/v1/states/${SERVICE_STATE_ID}/cities?areaIds=civil` });
+    await app.close();
+
+    expect(states.statusCode).toBe(200);
+    expect(states.json().states).toEqual([
+      expect.objectContaining({ id: SERVICE_STATE_ID, code: "DF" })
+    ]);
+    expect(states.json().states).not.toContainEqual(expect.objectContaining({ id: emptyState.id }));
+    expect(cities.statusCode).toBe(200);
+    expect(cities.json().cities).toEqual([
+      expect.objectContaining({ id: SERVICE_CITY_ID, name: "Brasilia" })
+    ]);
+    expect(cities.json().cities).not.toContainEqual(expect.objectContaining({ id: emptyCity.id }));
+    expect(cities.json().cities).not.toContainEqual(expect.objectContaining({ id: laborCity.id }));
+  });
+
   it("returns paginated city matches without client coordinates or fallback", async () => {
     const repos = createMemoryRepositories();
     const city = await repos.geographies.createCity({

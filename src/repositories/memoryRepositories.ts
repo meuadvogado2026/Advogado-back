@@ -305,9 +305,36 @@ class MemoryLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 const normalizeGeoName = (value: string) => value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+function isEligibleForCityCatalog(lawyer: LawyerRecord, areaIds: string[] = []) {
+  return (
+    lawyer.status === "approved" &&
+    lawyer.availableForMatches !== false &&
+    Boolean(lawyer.serviceCityId) &&
+    profiles.get(lawyer.profileId)?.blockedAt == null &&
+    lawyer.officeLocationStatus === "validated" &&
+    (areaIds.length === 0 || [lawyer.mainAreaId, ...lawyer.secondaryAreaIds].some((area) => areaIds.includes(area)))
+  );
+}
+
 class MemoryGeographyRepository implements GeographyRepository {
   async listStates(activeOnly = false) {
     return Array.from(states.values()).filter((state) => !activeOnly || state.active).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async listStatesWithAvailableLawyers(areaIds: string[] = []) {
+    const eligibleCityIds = new Set(
+      Array.from(lawyers.values())
+        .filter((lawyer) => isEligibleForCityCatalog(lawyer, areaIds))
+        .map((lawyer) => lawyer.serviceCityId)
+        .filter((cityId): cityId is string => Boolean(cityId))
+    );
+    const eligibleStateIds = new Set(
+      Array.from(cities.values())
+        .filter((city) => city.active && eligibleCityIds.has(city.id))
+        .map((city) => city.stateId)
+    );
+    return Array.from(states.values())
+      .filter((state) => state.active && eligibleStateIds.has(state.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
   async getState(id: string) { return states.get(id) ?? null; }
   async createState(input: StateCreate) {
@@ -341,6 +368,17 @@ class MemoryGeographyRepository implements GeographyRepository {
   }
   async listCities(stateId?: string, activeOnly = false) {
     return Array.from(cities.values()).filter((city) => (!stateId || city.stateId === stateId) && (!activeOnly || city.active)).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async listCitiesWithAvailableLawyers(stateId: string, areaIds: string[] = []) {
+    const eligibleCityIds = new Set(
+      Array.from(lawyers.values())
+        .filter((lawyer) => isEligibleForCityCatalog(lawyer, areaIds))
+        .map((lawyer) => lawyer.serviceCityId)
+        .filter((cityId): cityId is string => Boolean(cityId))
+    );
+    return Array.from(cities.values())
+      .filter((city) => city.stateId === stateId && city.active && states.get(city.stateId)?.active && eligibleCityIds.has(city.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
   async getCity(id: string) { return cities.get(id) ?? null; }
   async createCity(input: CityCreate) {

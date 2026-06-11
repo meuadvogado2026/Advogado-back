@@ -25,6 +25,15 @@ function paginated<T>(items: T[], query: { page?: string; pageSize?: string }) {
   };
 }
 
+function parseAreaIds(query: { areaIds?: string | string[] }) {
+  const raw = Array.isArray(query.areaIds) ? query.areaIds.join(",") : query.areaIds ?? "";
+  return raw
+    .split(",")
+    .map((areaId) => areaId.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
 export async function registerGeographyRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
   const audit = (request: any, action: string, entityType: "state" | "city", entityId?: string) =>
@@ -35,12 +44,14 @@ export async function registerGeographyRoutes(app: FastifyInstance, env: AppEnv,
       entityId
     });
 
-  app.get("/states", async () => ({ states: await repositories.geographies.listStates(true) }));
+  app.get("/states", async (request) => ({
+    states: await repositories.geographies.listStatesWithAvailableLawyers(parseAreaIds(request.query as { areaIds?: string | string[] }))
+  }));
   app.get("/states/:stateId/cities", async (request, reply) => {
     const { stateId } = request.params as { stateId: string };
     const state = await repositories.geographies.getState(stateId);
     if (!state?.active) return reply.code(404).send(apiError("NOT_FOUND", "Estado nao encontrado."));
-    return { cities: await repositories.geographies.listCities(stateId, true) };
+    return { cities: await repositories.geographies.listCitiesWithAvailableLawyers(stateId, parseAreaIds(request.query as { areaIds?: string | string[] })) };
   });
 
   app.get("/admin/states", { preHandler: requireAdmin }, async (request) => {

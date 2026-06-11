@@ -1,5 +1,11 @@
 # Backend Status - Advogado 2.0
 
+- 2026-06-10: catalogo publico de localidades ajustado para retornar somente
+  estados/cidades com advogado elegivel para busca por cidade, com filtro opcional
+  por `areaIds` e tolerancia a slug/UUID no Supabase. `npm run harness` exit `0`
+  com `84` testes; sonda local Supabase para `areaIds=civil` retornou apenas
+  localidades elegiveis.
+
 ## Spec 012 - 2026-06-10
 
 - Refinamento do catalogo: `GET /v1/admin/states` e `/v1/admin/cities` retornam

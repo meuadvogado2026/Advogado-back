@@ -87,11 +87,13 @@ export type CityRecord = {
 
 export interface GeographyRepository {
   listStates(activeOnly?: boolean): Promise<StateRecord[]>;
+  listStatesWithAvailableLawyers(areaIds?: string[]): Promise<StateRecord[]>;
   getState(id: string): Promise<StateRecord | null>;
   createState(input: StateCreate): Promise<StateRecord>;
   updateState(id: string, patch: StatePatch): Promise<StateRecord | null>;
   deleteState(id: string): Promise<"deleted" | "linked" | "not_found">;
   listCities(stateId?: string, activeOnly?: boolean): Promise<CityRecord[]>;
+  listCitiesWithAvailableLawyers(stateId: string, areaIds?: string[]): Promise<CityRecord[]>;
   getCity(id: string): Promise<CityRecord | null>;
   createCity(input: CityCreate): Promise<CityRecord>;
   updateCity(id: string, patch: CityPatch): Promise<CityRecord | null>;
