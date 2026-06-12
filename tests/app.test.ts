@@ -472,6 +472,14 @@ describe("foundation API", () => {
     expect(smoke).not.toContain("city: b?.lawyer?.city");
   });
 
+  it("hydrates independent lawyer relations in parallel", () => {
+    const repository = readFileSync("src/repositories/supabaseRepositories.ts", "utf8");
+
+    expect(repository).toMatch(/const \[profilesResult, specialtiesResult\] = await Promise\.all/);
+    expect(repository).toContain("profiles.listLawyerSummaries");
+    expect(repository).toContain("lawyer_specialties.listForLawyers");
+  });
+
   it("validates public client signup payload", async () => {
     const app = await buildApp();
     const response = await app.inject({

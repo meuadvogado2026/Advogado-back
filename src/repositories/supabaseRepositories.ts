@@ -603,16 +603,19 @@ class SupabaseLawyerRepository implements LawyerRepository {
     const profileIds = [...new Set(rows.map((row) => row.profile_id))];
     const lawyerIds = rows.map((row) => row.id);
 
-    const { data: profilesData, error: profilesError } = await this.supabase
-      .from("profiles")
-      .select("id, name, email, avatar_url, cover_url, must_change_password, access_invited_at, first_login_completed_at")
-      .in("id", profileIds);
+    const [profilesResult, specialtiesResult] = await Promise.all([
+      this.supabase
+        .from("profiles")
+        .select("id, name, email, avatar_url, cover_url, must_change_password, access_invited_at, first_login_completed_at")
+        .in("id", profileIds),
+      this.supabase
+        .from("lawyer_specialties")
+        .select("lawyer_profile_id, specialty_id, is_main")
+        .in("lawyer_profile_id", lawyerIds)
+    ]);
+    const { data: profilesData, error: profilesError } = profilesResult;
+    const { data: specialtiesData, error: specialtiesError } = specialtiesResult;
     assertSupabaseOk(profilesError, "profiles.listLawyerSummaries");
-
-    const { data: specialtiesData, error: specialtiesError } = await this.supabase
-      .from("lawyer_specialties")
-      .select("lawyer_profile_id, specialty_id, is_main")
-      .in("lawyer_profile_id", lawyerIds);
     assertSupabaseOk(specialtiesError, "lawyer_specialties.listForLawyers");
 
     const profileById = new Map(
