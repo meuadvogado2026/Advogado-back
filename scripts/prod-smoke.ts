@@ -11,7 +11,7 @@ import { createSupabaseAdminClient } from "../src/lib/supabase.js";
  * faz fetch contra a URL publica, validando o deploy de ponta a ponta:
  *  - GET  /health
  *  - GET  /v1/areas
- *  - POST /v1/match (cliente real): matched SP/civil, empty SP/criminal, 401 sem token
+ *  - POST /v1/match (cliente real): matched com advogado elegivel, empty com area inexistente, 401 sem token
  *  - GET  /v1/lawyers/:id (cliente real): 200 com allowlist publica, 401 sem token
  *  - POST /v1/admin/geocode/cep (admin real): 200
  *  - GET  /v1/admin/lawyers (admin real): 200 persistence=supabase
@@ -32,9 +32,7 @@ if (!BASE) throw new Error("PROD_BASE_URL e obrigatoria (ex.: https://seu-app.up
 const ADMIN_EMAIL = "admin@advogado20.com";
 const CLIENT_EMAIL = "usuario@advogado20.com";
 const LAWYER_EMAIL = "advogado@advogado20.com";
-const SP_FIXTURE = { lat: -23.561414, lng: -46.655881 };
 const EXACT_FIXTURE_TOLERANCE_KM = 0.05;
-const COVERED = new Set(["civil", "consumidor", "trabalhista", "familia"]);
 const PUBLIC_PROFILE_KEYS = new Set([
   "id",
   "name",
@@ -95,6 +93,19 @@ const startedAt = new Date(Date.now() - 1000).toISOString();
 const mark = (s: Record<string, unknown>, pass: boolean) => { ok &&= pass; steps.push({ ...s, ok: pass }); };
 const prayerRequestIds: string[] = [];
 
+type MatchCandidate = {
+  id: string;
+  status: string;
+  availableForMatches?: boolean;
+  officeLocationPresent?: boolean;
+  officeGeocodeConfidence?: string | null;
+  officeGeocodePrecision?: string | null;
+  officeLat?: number | null;
+  officeLng?: number | null;
+  mainAreaId?: string;
+  secondaryAreaIds?: string[];
+};
+
 // health
 const health = await call("/health");
 mark({ step: "GET /health", status: health.status }, health.status === 200);
@@ -102,22 +113,54 @@ mark({ step: "GET /health", status: health.status }, health.status === 200);
 // areas
 const areas = await call("/v1/areas");
 const list = (areas.body as { areas?: Array<{ id: string; slug: string }> })?.areas ?? [];
-const civil = list.find((a) => a.slug === "civil");
-const uncovered = list.find((a) => !COVERED.has(a.slug));
-mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && list.length >= 8 && Boolean(civil));
+mark({ step: "GET /v1/areas", status: areas.status, count: list.length }, areas.status === 200 && list.length >= 8);
+
+// Lista admin tambem fornece um candidato real para o match sem depender de seed.
+const lw = await call("/v1/admin/lawyers", { headers: adminH });
+const pers = (lw.body as { persistence?: string })?.persistence;
+const lawyers = (lw.body as { lawyers?: MatchCandidate[] })?.lawyers ?? [];
+const candidate = lawyers.find(
+  (lawyer) =>
+    lawyer.status === "approved" &&
+    lawyer.availableForMatches !== false &&
+    lawyer.officeLocationPresent === true &&
+    lawyer.officeGeocodeConfidence === "high" &&
+    (lawyer.officeGeocodePrecision === "street" || lawyer.officeGeocodePrecision === "manual") &&
+    Number.isFinite(lawyer.officeLat) &&
+    Number.isFinite(lawyer.officeLng) &&
+    Boolean(lawyer.mainAreaId || lawyer.secondaryAreaIds?.[0])
+);
+mark(
+  {
+    step: "GET /v1/admin/lawyers",
+    status: lw.status,
+    persistence: pers,
+    hasEligibleMatchCandidate: Boolean(candidate)
+  },
+  lw.status === 200 && pers === "supabase" && Boolean(candidate)
+);
 
 // match matched
 let matchedLawyerId: string | undefined;
-if (civil) {
-  const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [civil.id] }) });
+const candidateAreaId = candidate?.mainAreaId ?? candidate?.secondaryAreaIds?.[0];
+if (candidate && candidateAreaId) {
+  const m = await call("/v1/match", {
+    method: "POST",
+    headers: clientH,
+    body: JSON.stringify({
+      lat: candidate.officeLat,
+      lng: candidate.officeLng,
+      accuracyM: 20,
+      areaIds: [candidateAreaId]
+    })
+  });
   const b = m.body as { status?: string; lawyer?: { id?: string; city?: string }; distanceKm?: number };
   matchedLawyerId = b?.lawyer?.id;
   mark(
     {
-      step: "POST /v1/match SP/civil",
+      step: "POST /v1/match candidato elegivel",
       status: m.status,
       matchStatus: b?.status,
-      city: b?.lawyer?.city,
       distanceKm: b?.distanceKm,
       maxExpectedDistanceKm: EXACT_FIXTURE_TOLERANCE_KM
     },
@@ -149,22 +192,38 @@ if (matchedLawyerId) {
 }
 
 // match empty
-if (uncovered) {
-  const m = await call("/v1/match", { method: "POST", headers: clientH, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: [uncovered.id] }) });
-  mark({ step: `POST /v1/match SP/${uncovered.slug}`, status: m.status, matchStatus: (m.body as { status?: string })?.status }, m.status === 200 && (m.body as { status?: string })?.status === "empty");
+if (candidate) {
+  const m = await call("/v1/match", {
+    method: "POST",
+    headers: clientH,
+    body: JSON.stringify({
+      lat: candidate.officeLat,
+      lng: candidate.officeLng,
+      accuracyM: 20,
+      areaIds: [crypto.randomUUID()]
+    })
+  });
+  mark(
+    { step: "POST /v1/match area inexistente", status: m.status, matchStatus: (m.body as { status?: string })?.status },
+    m.status === 200 && (m.body as { status?: string })?.status === "empty"
+  );
 }
 // match no token
-const noTok = await call("/v1/match", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...SP_FIXTURE, accuracyM: 20, areaIds: civil ? [civil.id] : ["x"] }) });
+const noTok = await call("/v1/match", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    lat: candidate?.officeLat ?? 0,
+    lng: candidate?.officeLng ?? 0,
+    accuracyM: 20,
+    areaIds: candidateAreaId ? [candidateAreaId] : [crypto.randomUUID()]
+  })
+});
 mark({ step: "POST /v1/match sem token", status: noTok.status }, noTok.status === 401);
 
 // admin geocode
 const geo = await call("/v1/admin/geocode/cep", { method: "POST", headers: adminH, body: JSON.stringify({ cep: "01310-100" }) });
 mark({ step: "POST /v1/admin/geocode/cep", status: geo.status, persistence: (geo.body as { persistence?: string })?.persistence }, geo.status === 200);
-
-// admin list
-const lw = await call("/v1/admin/lawyers", { headers: adminH });
-const pers = (lw.body as { persistence?: string })?.persistence;
-mark({ step: "GET /v1/admin/lawyers", status: lw.status, persistence: pers }, lw.status === 200 && pers === "supabase");
 
 // spec 008 part 3 - lawyer dashboard auth/role matrix
 const dashboardNoTok = await call("/v1/lawyer/me/dashboard");

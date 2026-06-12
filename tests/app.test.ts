@@ -463,6 +463,15 @@ describe("foundation API", () => {
     expect(explainSql).not.toMatch(/\b(insert|update|delete|truncate|drop)\b/i);
   });
 
+  it("keeps production smoke independent from optional match fixture seeds", () => {
+    const smoke = readFileSync("scripts/prod-smoke.ts", "utf8");
+
+    expect(smoke).toContain("hasEligibleMatchCandidate");
+    expect(smoke).toContain("crypto.randomUUID()");
+    expect(smoke).not.toContain("SP_FIXTURE");
+    expect(smoke).not.toContain("city: b?.lawyer?.city");
+  });
+
   it("validates public client signup payload", async () => {
     const app = await buildApp();
     const response = await app.inject({
