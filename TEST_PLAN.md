@@ -40,7 +40,15 @@ Supabase real passou. P95: advogados/status `267.7 ms`, advogados/busca
 `240.7 ms`, oracoes/status `235.4 ms`, usuarios/busca `165.5 ms` e parceiros
 `113.8 ms`. Todas as respostas foram `200`, paginadas e com persistencia
 Supabase. O `EXPLAIN` direto ficou pendente porque `psql` nao esta instalado
-neste ambiente; o SQL read-only esta pronto para execucao no Supabase.
+neste ambiente; a tentativa pelo PostgREST retornou `PGRST107`, pois planos
+estao desabilitados no projeto. O SQL read-only esta pronto para execucao no
+Supabase SQL Editor.
+
+Depois da publicacao, a hidratacao de perfis e especialidades foi paralelizada
+sem alterar contrato. Benchmark Railway com 7 amostras: busca de advogados caiu
+de `1443.8 ms` para `1281.6 ms` p95; status ficou em `1463 ms` p95 com mediana
+de `1052.6 ms`, ainda abaixo do budget. `npm run prod:smoke` passou integralmente
+e limpou 2 eventos de match e 3 pedidos neutros.
 
 ## Testes Minimos
 

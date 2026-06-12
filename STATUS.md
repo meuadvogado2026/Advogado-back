@@ -1,5 +1,11 @@
 # Backend Status - Advogado 2.0
 
+- 2026-06-12: hidratacao das listas de advogados paralelizada no commit
+  `01ee531`, sem mudanca de contrato. Benchmark Railway com 7 amostras reduziu
+  busca de `1443.8 ms` para `1281.6 ms` p95; todas as rotas permaneceram abaixo
+  de `1500 ms`. Smoke de producao passou com limpeza completa. `EXPLAIN` via
+  PostgREST esta desabilitado (`PGRST107`); SQL read-only segue disponivel para
+  o SQL Editor.
 - 2026-06-12: performance das listas admin validada apos aplicacao da migration
   `0013`. `npm run admin-filter:perf` passou com p95 entre `113.8 ms` e
   `267.7 ms`, abaixo do budget de `1500 ms`, usando Supabase real e sem escrita,
