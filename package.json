@@ -18,6 +18,8 @@
     "seed:test-users": "tsx scripts/seed-test-users.ts",
     "auth:smoke": "tsx scripts/auth-smoke.ts",
     "form:smoke": "tsx scripts/admin-form-smoke.ts",
+    "admin-filter:smoke": "tsx scripts/admin-filter-smoke.ts",
+    "admin-filter:perf": "tsx scripts/admin-filter-performance.ts",
     "match:smoke": "tsx scripts/match-smoke.ts",
     "prod:smoke": "tsx scripts/prod-smoke.ts",
     "retention:match-events": "tsx scripts/retention-match-events.ts",

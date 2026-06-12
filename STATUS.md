@@ -1,5 +1,11 @@
 # Backend Status - Advogado 2.0
 
+- 2026-06-12: performance das listas admin validada apos aplicacao da migration
+  `0013`. `npm run admin-filter:perf` passou com p95 entre `113.8 ms` e
+  `267.7 ms`, abaixo do budget de `1500 ms`, usando Supabase real e sem escrita,
+  PII ou token no relatorio. Diagnostico `EXPLAIN` read-only versionado para
+  execucao no SQL Editor; `psql` segue indisponivel localmente. Gates completos:
+  backend 92 testes, admin 25, mobile 16, builds/harness/audits e Expo check OK.
 - 2026-06-10: catalogo publico de localidades ajustado para retornar somente
   estados/cidades com advogado elegivel para busca por cidade, com filtro opcional
   por `areaIds` e tolerancia a slug/UUID no Supabase. `npm run harness` exit `0`

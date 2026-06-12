@@ -446,6 +446,23 @@ describe("foundation API", () => {
     expect(hardeningSql).toMatch(/st_dwithin/i);
   });
 
+  it("keeps admin filter performance diagnostics read-only and redacted", () => {
+    const packageJson = readFileSync("package.json", "utf8");
+    const benchmark = readFileSync("scripts/admin-filter-performance.ts", "utf8");
+    const explainSql = readFileSync("scripts/sql/admin-filter-explain.sql", "utf8");
+
+    expect(packageJson).toMatch(/"admin-filter:perf":\s*"tsx scripts\/admin-filter-performance\.ts"/);
+    expect(benchmark).toMatch(/ADMIN_FILTER_PERF_BASE_URL/);
+    expect(benchmark).toMatch(/url\.protocol !== "https:"/);
+    expect(benchmark).toMatch(/token:\s*"REDACTED"/);
+    expect(benchmark).toMatch(/destructive:\s*false/);
+    expect(benchmark).not.toMatch(/console\.log\([^)]*access_token/);
+    expect(explainSql).toMatch(/begin read only/i);
+    expect(explainSql).toMatch(/explain \(analyze, buffers, format text\)/i);
+    expect(explainSql).toMatch(/rollback/i);
+    expect(explainSql).not.toMatch(/\b(insert|update|delete|truncate|drop)\b/i);
+  });
+
   it("validates public client signup payload", async () => {
     const app = await buildApp();
     const response = await app.inject({
@@ -602,6 +619,53 @@ describe("foundation API", () => {
       secondaryAreaIds: ["consumidor"],
       status: "draft"
     });
+  });
+
+  it("paginates admin lawyers when page query is provided", async () => {
+    const app = await buildApp();
+    const list = await app.inject({ method: "GET", url: "/v1/admin/lawyers?page=1&pageSize=1", headers: ADMIN });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().lawyers.length).toBeLessThanOrEqual(1);
+    expect(list.json().pagination).toMatchObject({ page: 1, pageSize: 1 });
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(list.json().lawyers.length);
+  });
+
+  it("filters paginated admin lawyers by search and status", async () => {
+    const app = await buildApp();
+    const email = `filtered-lawyer-${Date.now()}@example.test`;
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/admin/lawyers",
+      headers: ADMIN,
+      payload: {
+        name: "Dra. Filtro Servidor",
+        serviceStateId: SERVICE_STATE_ID,
+        serviceCityId: SERVICE_CITY_ID,
+        email,
+        whatsapp: "11999997777",
+        oabNumber: "998877",
+        oabState: "SP",
+        mainAreaId: "civil",
+        secondaryAreaIds: [],
+        officeCep: "01001-000",
+        officeNumber: "103",
+        officeManualLocation: { lat: -23.55052, lng: -46.633308 },
+        status: "draft"
+      }
+    });
+    const list = await app.inject({
+      method: "GET",
+      url: "/v1/admin/lawyers?page=1&pageSize=5&status=draft&search=998877",
+      headers: ADMIN
+    });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(list.statusCode).toBe(200);
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(1);
+    expect(list.json().lawyers.every((lawyer: { status: string; oabNumber: string }) => lawyer.status === "draft" && lawyer.oabNumber.includes("998877"))).toBe(true);
   });
 
   it("persists the geocoded coordinate when creating a lawyer", async () => {
@@ -1076,6 +1140,53 @@ describe("foundation API", () => {
     });
   });
 
+  it("paginates admin prayer requests when page query is provided", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "Pedido paginado numero um com tamanho suficiente.", anonymous: true }
+    });
+    await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "Pedido paginado numero dois com tamanho suficiente.", anonymous: true }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/prayer-requests?page=1&pageSize=1", headers: ADMIN });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().requests).toHaveLength(1);
+    expect(list.json().pagination).toMatchObject({ page: 1, pageSize: 1 });
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(2);
+  });
+
+  it("filters paginated admin prayer requests by status", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: "/v1/prayer-requests",
+      headers: CLIENT,
+      payload: { message: "Pedido filtrado para leitura com tamanho suficiente.", anonymous: true }
+    });
+    const created = await app.inject({ method: "GET", url: "/v1/admin/prayer-requests?page=1&pageSize=1", headers: ADMIN });
+    const requestId = created.json().requests[0].id;
+    await app.inject({
+      method: "PATCH",
+      url: `/v1/admin/prayer-requests/${requestId}`,
+      headers: ADMIN,
+      payload: { status: "read" }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/prayer-requests?page=1&pageSize=10&status=read", headers: ADMIN });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(1);
+    expect(list.json().requests.every((request: { status: string }) => request.status === "read")).toBe(true);
+  });
+
   it("lets admin mark a prayer request as read", async () => {
     const app = await buildApp();
     await app.inject({
@@ -1115,6 +1226,27 @@ describe("foundation API", () => {
     expect(client.email).toBe("client@example.test");
     expect(patch.statusCode).toBe(200);
     expect(patch.json().user.blockedAt).toBeTruthy();
+  });
+
+  it("paginates admin users when page query is provided", async () => {
+    const app = await buildApp();
+    const list = await app.inject({ method: "GET", url: "/v1/admin/users?page=1&pageSize=2", headers: ADMIN });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().users).toHaveLength(2);
+    expect(list.json().pagination).toMatchObject({ page: 1, pageSize: 2 });
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(2);
+  });
+
+  it("filters paginated admin users by search", async () => {
+    const app = await buildApp();
+    const list = await app.inject({ method: "GET", url: "/v1/admin/users?page=1&pageSize=10&search=client%40example.test", headers: ADMIN });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(1);
+    expect(list.json().users.every((user: { email: string }) => user.email.includes("client@example.test"))).toBe(true);
   });
 
   it("prevents admin from blocking the current admin session", async () => {
@@ -1187,6 +1319,29 @@ describe("foundation API", () => {
     expect(create.json().partner).toMatchObject({ name: "Parceiro Teste", active: true });
     expect(adminList.json().partners[0].logoUrl).toBe(upload.json().image.url);
     expect(publicList.json().partners[0]).toMatchObject({ name: "Parceiro Teste", logoUrl: upload.json().image.url });
+  });
+
+  it("paginates admin partner logos when page query is provided", async () => {
+    const app = await buildApp();
+    await app.inject({
+      method: "POST",
+      url: "/v1/admin/partner-logos",
+      headers: ADMIN,
+      payload: { name: "Parceiro Pagina 1", logoUrl: "https://partner.example.test/1.png", active: true }
+    });
+    await app.inject({
+      method: "POST",
+      url: "/v1/admin/partner-logos",
+      headers: ADMIN,
+      payload: { name: "Parceiro Pagina 2", logoUrl: "https://partner.example.test/2.png", active: true }
+    });
+    const list = await app.inject({ method: "GET", url: "/v1/admin/partner-logos?page=1&pageSize=1", headers: ADMIN });
+    await app.close();
+
+    expect(list.statusCode).toBe(200);
+    expect(list.json().partners).toHaveLength(1);
+    expect(list.json().pagination).toMatchObject({ page: 1, pageSize: 1 });
+    expect(list.json().pagination.total).toBeGreaterThanOrEqual(2);
   });
 
   it("manages states and cities with duplicate and linked-delete protection", async () => {

@@ -14,12 +14,36 @@ import { registerSpec008Routes } from "./modules/spec008/routes.js";
 import { createRepositories } from "./repositories/index.js";
 import type { Repositories } from "./repositories/types.js";
 
+const productionLogger = {
+  redact: {
+    paths: [
+      "req.headers.authorization",
+      "req.headers.cookie",
+      "req.headers['set-cookie']",
+      "req.body.password",
+      "req.body.newPassword",
+      "req.body.token",
+      "req.body.access_token",
+      "req.body.refresh_token",
+      "req.body.message",
+      "req.body.lat",
+      "req.body.lng",
+      "req.body.accuracyM",
+      "req.body.location",
+      "req.body.client_location",
+      "req.body.officeManualLocation",
+      "res.headers['set-cookie']"
+    ],
+    censor: "[REDACTED]"
+  }
+};
+
 export async function buildApp(repositoriesOverride?: Repositories) {
   const env = loadEnv();
   const repositories = repositoriesOverride ?? createRepositories(env);
   const app = Fastify({
     bodyLimit: 4_000_000,
-    logger: env.NODE_ENV === "production"
+    logger: env.NODE_ENV === "production" ? productionLogger : false
   });
 
   await app.register(cors, {

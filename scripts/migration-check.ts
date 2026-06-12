@@ -27,6 +27,13 @@ const requiredByMigration: Record<string, RegExp[]> = {
     /'empresarial',\s*'Direito Empresarial'/i,
     /'tributario',\s*'Direito Tributário'/i,
     /on conflict \(slug\) do update/i
+  ],
+  "0013_admin_filtered_list_indexes.sql": [
+    /create extension if not exists pg_trgm/i,
+    /profiles_admin_name_trgm_idx/i,
+    /lawyer_profiles_admin_status_created_at_idx/i,
+    /prayer_requests_status_created_at_idx/i,
+    /partner_logos_admin_created_at_idx/i
   ]
 };
 

@@ -18,6 +18,8 @@ import type {
   Profile,
   ProfileRepository,
   PublicLawyerProfileRepository,
+  PageInput,
+  PageResult,
   StoredAdminImage,
   StoredLawyerImage,
   PrayerRequestRepository,
@@ -48,6 +50,18 @@ const prayerRequests: Array<{
 const partnerLogos: PartnerLogoRecord[] = [];
 
 const seedCreatedAt = "2026-06-03T00:00:00.000Z";
+
+function pageItems<T>(items: T[], input: PageInput): PageResult<T> {
+  const start = (input.page - 1) * input.pageSize;
+  return {
+    items: items.slice(start, start + input.pageSize),
+    total: items.length
+  };
+}
+
+function normalizeSearch(value: string) {
+  return value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
 
 function officeLocationStatus(input: {
   officeLat?: number | null;
@@ -185,6 +199,17 @@ class MemoryProfileRepository implements ProfileRepository {
     return Array.from(profiles.values())
       .map(toAdminUser)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listAdminUsersPage(input: PageInput) {
+    const search = normalizeSearch(input.search ?? "");
+    const users = (await this.listAdminUsers()).filter((user) => {
+      if (!search) return true;
+      return [user.name, user.email, user.phone, user.role]
+        .filter(Boolean)
+        .some((value) => normalizeSearch(String(value)).includes(search));
+    });
+    return pageItems(users, input);
   }
 
   async createClientProfile(input: { id: string; name: string; email: string }) {
@@ -418,6 +443,19 @@ class MemoryLawyerRepository implements LawyerRepository {
 
   async list() {
     return Array.from(lawyers.values());
+  }
+
+  async listPage(input: PageInput) {
+    const search = normalizeSearch(input.search ?? "");
+    const items = (await this.list()).filter((lawyer) => {
+      const statusMatches = !input.status || lawyer.status === input.status;
+      if (!statusMatches) return false;
+      if (!search) return true;
+      return [lawyer.name, lawyer.email, lawyer.oabNumber, lawyer.oabState, lawyer.officeCity, lawyer.officeState]
+        .filter(Boolean)
+        .some((value) => normalizeSearch(String(value)).includes(search));
+    });
+    return pageItems(items, input);
   }
 
   async getById(id: string) {
@@ -820,6 +858,11 @@ class MemoryPrayerRequestRepository implements PrayerRequestRepository {
       .map((request) => this.toAdminRecord(request));
   }
 
+  async listAdminPage(input: PageInput) {
+    const items = (await this.listAdmin()).filter((request) => !input.status || request.status === input.status);
+    return pageItems(items, input);
+  }
+
   async updateStatus(id: string, status: "received" | "read") {
     const index = prayerRequests.findIndex((request) => request.id === id);
     if (index === -1) return null;
@@ -853,6 +896,10 @@ class MemoryLawyerMediaRepository implements LawyerMediaRepository {
 class MemoryPartnerLogoRepository implements PartnerLogoRepository {
   async listAdmin() {
     return [...partnerLogos].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listAdminPage(input: PageInput) {
+    return pageItems(await this.listAdmin(), input);
   }
 
   async listPublic() {

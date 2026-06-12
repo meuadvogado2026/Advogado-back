@@ -36,6 +36,18 @@ export type AdminUserRecord = {
   lawyerStatus?: LawyerRecord["status"] | null;
 };
 
+export type PageInput = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  status?: string;
+};
+
+export type PageResult<T> = {
+  items: T[];
+  total: number;
+};
+
 export type LawyerVisualFields = {
   avatarUrl?: string | null;
   coverUrl?: string | null;
@@ -123,6 +135,7 @@ export type LawyerOfficeLocation = {
 export interface ProfileRepository {
   getById(id: string): Promise<Profile | null>;
   listAdminUsers(): Promise<AdminUserRecord[]>;
+  listAdminUsersPage(input: PageInput): Promise<PageResult<AdminUserRecord>>;
   createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile>;
   createLawyerProfile(
     input: Pick<LawyerCreate, "name" | "email" | "whatsapp" | "avatarUrl" | "coverUrl">,
@@ -141,6 +154,7 @@ export interface LegalSpecialtyRepository {
 
 export interface LawyerRepository {
   list(): Promise<LawyerRecord[]>;
+  listPage(input: PageInput): Promise<PageResult<LawyerRecord>>;
   getById(id: string): Promise<LawyerRecord | null>;
   create(
     input: LawyerCreate,
@@ -228,6 +242,7 @@ export type AdminPrayerRequestRecord = PrayerRequestRecord & {
 export interface PrayerRequestRepository {
   create(input: PrayerRequest & { clientProfileId: string }): Promise<PrayerRequestRecord>;
   listAdmin(): Promise<AdminPrayerRequestRecord[]>;
+  listAdminPage(input: PageInput): Promise<PageResult<AdminPrayerRequestRecord>>;
   updateStatus(id: string, status: PrayerRequestRecord["status"]): Promise<AdminPrayerRequestRecord | null>;
 }
 
@@ -259,6 +274,7 @@ export type StoredAdminImage = {
 
 export interface PartnerLogoRepository {
   listAdmin(): Promise<PartnerLogoRecord[]>;
+  listAdminPage(input: PageInput): Promise<PageResult<PartnerLogoRecord>>;
   listPublic(): Promise<PartnerLogoRecord[]>;
   create(input: AdminPartnerLogoCreate): Promise<PartnerLogoRecord>;
   uploadLogo(input: AdminImageUpload): Promise<StoredAdminImage>;

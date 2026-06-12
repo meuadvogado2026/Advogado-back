@@ -22,6 +22,26 @@ O harness executa:
 - `npm run migration:check`
 - `npm run smoke`
 
+## Performance Das Listas Admin
+
+- `npm run admin-filter:perf`: executa 2 aquecimentos e 7 amostras por rota
+  autenticada, sem imprimir token, PII ou corpos de resposta.
+- `ADMIN_FILTER_PERF_BASE_URL=https://... npm run admin-filter:perf`: repete o
+  mesmo benchmark pela URL publica; destinos HTTP sao recusados.
+- Orcamento padrao: p95 menor ou igual a `1500 ms`, configuravel por
+  `ADMIN_FILTER_P95_BUDGET_MS`.
+- `scripts/sql/admin-filter-explain.sql`: diagnostico read-only para confirmar
+  indices e revisar `Planning Time`, `Execution Time` e buffers no SQL Editor.
+- Em tabelas pequenas, `Seq Scan` pode ser a escolha correta do PostgreSQL e
+  nao deve ser tratado isoladamente como falha.
+
+Resultado em 2026-06-12 apos aplicacao da migration `0013`: benchmark com
+Supabase real passou. P95: advogados/status `267.7 ms`, advogados/busca
+`240.7 ms`, oracoes/status `235.4 ms`, usuarios/busca `165.5 ms` e parceiros
+`113.8 ms`. Todas as respostas foram `200`, paginadas e com persistencia
+Supabase. O `EXPLAIN` direto ficou pendente porque `psql` nao esta instalado
+neste ambiente; o SQL read-only esta pronto para execucao no Supabase.
+
 ## Testes Minimos
 
 - Auth/roles.

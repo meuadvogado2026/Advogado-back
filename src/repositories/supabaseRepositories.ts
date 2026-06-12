@@ -18,6 +18,8 @@ import type {
   MatchEventRepository,
   MatchRepository,
   NearestLawyerInput,
+  PageInput,
+  PageResult,
   PartnerLogoRecord,
   PartnerLogoRepository,
   Profile,
@@ -34,6 +36,18 @@ function assertSupabaseOk(error: { message: string } | null, context: string) {
   if (error) {
     throw new Error(`${context}: ${error.message}`);
   }
+}
+
+function pageRange(input: PageInput) {
+  const from = (input.page - 1) * input.pageSize;
+  return { from, to: from + input.pageSize - 1 };
+}
+
+function searchPattern(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const escaped = trimmed.replace(/,/g, " ").replace(/[%_]/g, "\\$&").slice(0, 80);
+  return `%${escaped}%`;
 }
 
 const normalizeGeoName = (value: string) =>
@@ -79,6 +93,31 @@ function mapProfile(row: ProfileRow): Profile {
 class SupabaseProfileRepository implements ProfileRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
+  private mapAdminUsers(profilesData: ProfileRow[], lawyersData: Array<{ id: string; profile_id: string; status: LawyerRecord["status"] }>): AdminUserRecord[] {
+    const lawyerByProfileId = new Map(lawyersData.map((lawyer) => [lawyer.profile_id, lawyer]));
+
+    return profilesData.map((profile) => {
+      const lawyer = lawyerByProfileId.get(profile.id);
+      return {
+        id: profile.id,
+        role: profile.role,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        avatarUrl: profile.avatar_url,
+        coverUrl: profile.cover_url,
+        blockedAt: profile.blocked_at,
+        mustChangePassword: profile.must_change_password ?? false,
+        accessInvitedAt: profile.access_invited_at,
+        firstLoginCompletedAt: profile.first_login_completed_at,
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at,
+        lawyerProfileId: lawyer?.id ?? null,
+        lawyerStatus: lawyer?.status ?? null
+      };
+    });
+  }
+
   async getById(id: string): Promise<Profile | null> {
     const { data, error } = await this.supabase
       .from("profiles")
@@ -102,33 +141,44 @@ class SupabaseProfileRepository implements ProfileRepository {
       .select("id, profile_id, status");
     assertSupabaseOk(lawyersError, "lawyer_profiles.listForUsers");
 
-    const lawyerByProfileId = new Map(
-      ((lawyersData ?? []) as Array<{ id: string; profile_id: string; status: LawyerRecord["status"] }>).map((lawyer) => [
-        lawyer.profile_id,
-        lawyer
-      ])
+    return this.mapAdminUsers(
+      (profilesData ?? []) as ProfileRow[],
+      (lawyersData ?? []) as Array<{ id: string; profile_id: string; status: LawyerRecord["status"] }>
     );
+  }
 
-    return ((profilesData ?? []) as ProfileRow[]).map((profile) => {
-      const lawyer = lawyerByProfileId.get(profile.id);
-      return {
-        id: profile.id,
-        role: profile.role,
-        name: profile.name,
-        email: profile.email,
-        phone: profile.phone,
-        avatarUrl: profile.avatar_url,
-        coverUrl: profile.cover_url,
-        blockedAt: profile.blocked_at,
-        mustChangePassword: profile.must_change_password ?? false,
-        accessInvitedAt: profile.access_invited_at,
-        firstLoginCompletedAt: profile.first_login_completed_at,
-        createdAt: profile.created_at,
-        updatedAt: profile.updated_at,
-        lawyerProfileId: lawyer?.id ?? null,
-        lawyerStatus: lawyer?.status ?? null
-      };
-    });
+  async listAdminUsersPage(input: PageInput): Promise<PageResult<AdminUserRecord>> {
+    const { from, to } = pageRange(input);
+    const pattern = searchPattern(input.search);
+    let query = this.supabase
+      .from("profiles")
+      .select(PROFILE_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false });
+    if (pattern) {
+      const role = input.search?.trim().toLowerCase();
+      const roleFilter = role === "admin" || role === "client" || role === "lawyer" ? `,role.eq.${role}` : "";
+      query = query.or(`name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}${roleFilter}`);
+    }
+    const { data: profilesData, error: profilesError, count } = await query.range(from, to);
+    assertSupabaseOk(profilesError, "profiles.listAdminUsersPage");
+
+    const profileIds = ((profilesData ?? []) as ProfileRow[]).map((profile) => profile.id);
+    const { data: lawyersData, error: lawyersError } =
+      profileIds.length > 0
+        ? await this.supabase
+            .from("lawyer_profiles")
+            .select("id, profile_id, status")
+            .in("profile_id", profileIds)
+        : { data: [], error: null };
+    assertSupabaseOk(lawyersError, "lawyer_profiles.listForUsersPage");
+
+    return {
+      items: this.mapAdminUsers(
+        (profilesData ?? []) as ProfileRow[],
+        (lawyersData ?? []) as Array<{ id: string; profile_id: string; status: LawyerRecord["status"] }>
+      ),
+      total: count ?? 0
+    };
   }
 
   async createClientProfile(input: { id: string; name: string; email: string }): Promise<Profile> {
@@ -603,6 +653,48 @@ class SupabaseLawyerRepository implements LawyerRepository {
     assertSupabaseOk(error, "lawyer_profiles.list");
 
     return this.hydrateRows((data ?? []) as LawyerRow[]);
+  }
+
+  async listPage(input: PageInput): Promise<PageResult<LawyerRecord>> {
+    const { from, to } = pageRange(input);
+    const pattern = searchPattern(input.search);
+    let matchingProfileIds: string[] = [];
+    if (pattern) {
+      const { data: profilesData, error: profilesError } = await this.supabase
+        .from("profiles")
+        .select("id")
+        .or(`name.ilike.${pattern},email.ilike.${pattern}`)
+        .limit(200);
+      assertSupabaseOk(profilesError, "profiles.searchForLawyerPage");
+      matchingProfileIds = ((profilesData ?? []) as Array<{ id: string }>).map((profile) => profile.id);
+    }
+
+    let query = this.supabase
+      .from("lawyer_profiles")
+      .select(LAWYER_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false });
+    if (input.status) {
+      query = query.eq("status", input.status);
+    }
+    if (pattern) {
+      const directFilters = [
+        `oab_number.ilike.${pattern}`,
+        `oab_state.ilike.${pattern}`,
+        `office_city.ilike.${pattern}`,
+        `office_state.ilike.${pattern}`
+      ];
+      if (matchingProfileIds.length > 0) {
+        directFilters.push(`profile_id.in.(${matchingProfileIds.join(",")})`);
+      }
+      query = query.or(directFilters.join(","));
+    }
+    const { data, error, count } = await query.range(from, to);
+    assertSupabaseOk(error, "lawyer_profiles.listPage");
+
+    return {
+      items: await this.hydrateRows((data ?? []) as LawyerRow[]),
+      total: count ?? 0
+    };
   }
 
   async getById(id: string): Promise<LawyerRecord | null> {
@@ -1129,6 +1221,33 @@ class SupabasePrayerRequestRepository implements PrayerRequestRepository {
     return this.hydrateRows(rows);
   }
 
+  async listAdminPage(input: PageInput): Promise<PageResult<AdminPrayerRequestRecord>> {
+    const { from, to } = pageRange(input);
+    let query = this.supabase
+      .from("prayer_requests")
+      .select("id, client_profile_id, message, anonymous, status, created_at, read_at", { count: "exact" })
+      .order("created_at", { ascending: false });
+    if (input.status === "received" || input.status === "read") {
+      query = query.eq("status", input.status);
+    }
+    const { data, error, count } = await query.range(from, to);
+    assertSupabaseOk(error, "prayer_requests.listAdminPage");
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      client_profile_id: string | null;
+      message: string;
+      anonymous: boolean;
+      status: "received" | "read";
+      created_at: string;
+      read_at: string | null;
+    }>;
+    return {
+      items: await this.hydrateRows(rows),
+      total: count ?? 0
+    };
+  }
+
   async updateStatus(id: string, status: "received" | "read"): Promise<AdminPrayerRequestRecord | null> {
     const { data, error } = await this.supabase
       .from("prayer_requests")
@@ -1226,6 +1345,20 @@ class SupabasePartnerLogoRepository implements PartnerLogoRepository {
       .order("created_at", { ascending: false });
     assertSupabaseOk(error, "partner_logos.listAdmin");
     return ((data ?? []) as Parameters<SupabasePartnerLogoRepository["mapRow"]>[0][]).map((row) => this.mapRow(row));
+  }
+
+  async listAdminPage(input: PageInput): Promise<PageResult<PartnerLogoRecord>> {
+    const { from, to } = pageRange(input);
+    const { data, error, count } = await this.supabase
+      .from("partner_logos")
+      .select("id, name, logo_url, website_url, active, created_at, updated_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    assertSupabaseOk(error, "partner_logos.listAdminPage");
+    return {
+      items: ((data ?? []) as Parameters<SupabasePartnerLogoRepository["mapRow"]>[0][]).map((row) => this.mapRow(row)),
+      total: count ?? 0
+    };
   }
 
   async listPublic(): Promise<PartnerLogoRecord[]> {

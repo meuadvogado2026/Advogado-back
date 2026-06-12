@@ -19,6 +19,27 @@ export function isMatchEligibleGeocoding(coordinates: Coordinates | null | undef
 }
 
 const isValidCoordinate = isValidGeocodeCoordinate;
+const DEFAULT_LAWYERS_PAGE_SIZE = 25;
+const lawyerStatuses = new Set(["draft", "pending_review", "approved", "rejected", "suspended"]);
+
+function parsePagination(query: unknown) {
+  const value = (query ?? {}) as { page?: string; pageSize?: string; search?: string; status?: string };
+  if (!value.page && !value.pageSize && !value.search && !value.status) return null;
+  const page = Math.max(1, Number.parseInt(value.page ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(value.pageSize ?? String(DEFAULT_LAWYERS_PAGE_SIZE), 10) || DEFAULT_LAWYERS_PAGE_SIZE));
+  const search = value.search?.trim().slice(0, 80);
+  const status = lawyerStatuses.has(value.status ?? "") ? value.status : undefined;
+  return { page, pageSize, ...(search ? { search } : {}), ...(status ? { status } : {}) };
+}
+
+function paginationMeta(input: { page: number; pageSize: number }, total: number) {
+  return {
+    page: input.page,
+    pageSize: input.pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / input.pageSize))
+  };
+}
 
 export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
@@ -220,12 +241,24 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
   });
 
-  app.get("/admin/lawyers", { preHandler: requireAdmin }, async () => ({
-    lawyers: await repositories.lawyers.list(),
-    page: 1,
-    pageSize: 25,
-    persistence: repositories.mode
-  }));
+  app.get("/admin/lawyers", { preHandler: requireAdmin }, async (request) => {
+    const page = parsePagination(request.query);
+    if (!page) {
+      return {
+        lawyers: await repositories.lawyers.list(),
+        page: 1,
+        pageSize: 25,
+        persistence: repositories.mode
+      };
+    }
+
+    const result = await repositories.lawyers.listPage(page);
+    return {
+      lawyers: result.items,
+      pagination: paginationMeta(page, result.total),
+      persistence: repositories.mode
+    };
+  });
 
   app.post("/admin/lawyers", { preHandler: requireAdmin }, async (request, reply) => {
     const parsed = lawyerCreateSchema.safeParse(request.body);
