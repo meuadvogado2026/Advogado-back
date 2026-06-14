@@ -59,9 +59,8 @@ Resposta resumida de `POST /v1/match/by-city`:
 
 ## Advogado
 
-- `GET /v1/lawyer/me/dashboard` - implementado na spec 008 Parte 3; exige Bearer token `lawyer`
+- `GET /v1/lawyer/me/dashboard` - exige Bearer token `lawyer`; inclui beneficios ativos cadastrados pelo admin
 - `GET /v1/lawyer/vip-card`
-- `GET /v1/lawyer/benefits`
 
 ## Admin
 
@@ -79,6 +78,10 @@ Resposta resumida de `POST /v1/match/by-city`:
 - `GET /v1/admin/partner-logos` - listagem operacional de logos de parceiros
 - `POST /v1/admin/partner-logo-media` - upload server-side de logo de parceiro
 - `POST /v1/admin/partner-logos` - cadastro de parceiro com logo HTTPS
+- `GET /v1/admin/benefits` - lista beneficios cadastrados
+- `POST /v1/admin/benefits` - cadastra beneficio do painel do advogado
+- `PATCH /v1/admin/benefits/:id` - edita beneficio
+- `DELETE /v1/admin/benefits/:id` - remove beneficio
 - `GET /v1/admin/users` - listagem segura de usuarios cadastrados
 - `PATCH /v1/admin/users/:id` - bloqueio/desbloqueio de usuario
 - `GET /v1/admin/urgent-calls`
@@ -327,12 +330,11 @@ Resposta `200`:
     "verified": true
   },
   "metrics": { "profileViews": 0, "whatsappClicks": 0, "contacts": 0 },
-  "benefits": [{ "id": "verified-profile", "title": "Perfil verificado", "description": "..." }]
+  "benefits": [{ "id": "uuid", "title": "Desconto em software", "description": "...", "badge": "VIP", "redemptionUrl": "https://..." }]
 }
 ```
 
-Metricas sao zeradas/placeholder seguro no MVP. Beneficios sao estaticos, sem pagamento,
-parceiro externo, cupom real, chat ou agenda.
+Metricas sao zeradas/placeholder seguro no MVP. Beneficios retornam somente registros ativos da tabela `benefits`.
 
 ## POST /v1/prayer-requests (spec 008 Parte 3)
 

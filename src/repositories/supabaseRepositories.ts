@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
+import type { AdminBenefitCreate, AdminBenefitPatch, CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
 import type {
   AuditLogRepository,
   AdminPrayerRequestRecord,
   AdminUserRecord,
+  BenefitRecord,
+  BenefitRepository,
   GeographyRepository,
   LawyerCoordinates,
   LawyerDashboard,
@@ -1095,22 +1097,11 @@ type LawyerDashboardRow = {
   profiles: { name: string; avatar_url: string | null; cover_url: string | null } | Array<{ name: string; avatar_url: string | null; cover_url: string | null }>;
 };
 
-const staticLawyerBenefits: LawyerDashboard["benefits"] = [
-  {
-    id: "verified-profile",
-    title: "Perfil verificado",
-    description: "Presenca profissional no app com dados revisados pelo admin.",
-    badge: "MVP"
-  },
-  {
-    id: "external-whatsapp",
-    title: "Contato externo seguro",
-    description: "Atendimento segue pelo WhatsApp, sem chat interno no MVP."
-  }
-];
-
 class SupabaseLawyerDashboardRepository implements LawyerDashboardRepository {
-  constructor(private readonly supabase: SupabaseClient) {}
+  constructor(
+    private readonly supabase: SupabaseClient,
+    private readonly benefitRepository: BenefitRepository
+  ) {}
 
   async getByProfileId(profileId: string): Promise<LawyerDashboard | null> {
     const { data, error } = await this.supabase
@@ -1141,7 +1132,13 @@ class SupabaseLawyerDashboardRepository implements LawyerDashboardRepository {
         whatsappClicks: 0,
         contacts: 0
       },
-      benefits: staticLawyerBenefits
+      benefits: (await this.benefitRepository.listActive()).map((benefit) => ({
+        id: benefit.id,
+        title: benefit.title,
+        description: benefit.description,
+        ...(benefit.badge ? { badge: benefit.badge } : {}),
+        redemptionUrl: benefit.redemptionUrl ?? null
+      }))
     };
   }
 }
@@ -1423,18 +1420,119 @@ class SupabasePartnerLogoRepository implements PartnerLogoRepository {
   }
 }
 
+class SupabaseBenefitRepository implements BenefitRepository {
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  private mapRow(row: {
+    id: string;
+    title: string;
+    description: string;
+    badge: string | null;
+    redemption_url: string | null;
+    active: boolean;
+    created_at: string;
+    updated_at: string;
+  }): BenefitRecord {
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      badge: row.badge,
+      redemptionUrl: row.redemption_url,
+      active: row.active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  async listAdmin(): Promise<BenefitRecord[]> {
+    const { data, error } = await this.supabase
+      .from("benefits")
+      .select("id, title, description, badge, redemption_url, active, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    assertSupabaseOk(error, "benefits.listAdmin");
+    return ((data ?? []) as Parameters<SupabaseBenefitRepository["mapRow"]>[0][]).map((row) => this.mapRow(row));
+  }
+
+  async listAdminPage(input: PageInput): Promise<PageResult<BenefitRecord>> {
+    const { from, to } = pageRange(input);
+    const { data, error, count } = await this.supabase
+      .from("benefits")
+      .select("id, title, description, badge, redemption_url, active, created_at, updated_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    assertSupabaseOk(error, "benefits.listAdminPage");
+    return {
+      items: ((data ?? []) as Parameters<SupabaseBenefitRepository["mapRow"]>[0][]).map((row) => this.mapRow(row)),
+      total: count ?? 0
+    };
+  }
+
+  async listActive(): Promise<BenefitRecord[]> {
+    const { data, error } = await this.supabase
+      .from("benefits")
+      .select("id, title, description, badge, redemption_url, active, created_at, updated_at")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    assertSupabaseOk(error, "benefits.listActive");
+    return ((data ?? []) as Parameters<SupabaseBenefitRepository["mapRow"]>[0][]).map((row) => this.mapRow(row));
+  }
+
+  async create(input: AdminBenefitCreate): Promise<BenefitRecord> {
+    const { data, error } = await this.supabase
+      .from("benefits")
+      .insert({
+        title: input.title,
+        description: input.description,
+        badge: input.badge ?? null,
+        redemption_url: input.redemptionUrl ?? null,
+        active: input.active
+      })
+      .select("id, title, description, badge, redemption_url, active, created_at, updated_at")
+      .single();
+    assertSupabaseOk(error, "benefits.create");
+    return this.mapRow(data as Parameters<SupabaseBenefitRepository["mapRow"]>[0]);
+  }
+
+  async update(id: string, patch: AdminBenefitPatch): Promise<BenefitRecord | null> {
+    const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (patch.title !== undefined) payload.title = patch.title;
+    if (patch.description !== undefined) payload.description = patch.description;
+    if (patch.badge !== undefined) payload.badge = patch.badge ?? null;
+    if (patch.redemptionUrl !== undefined) payload.redemption_url = patch.redemptionUrl ?? null;
+    if (patch.active !== undefined) payload.active = patch.active;
+
+    const { data, error } = await this.supabase
+      .from("benefits")
+      .update(payload)
+      .eq("id", id)
+      .select("id, title, description, badge, redemption_url, active, created_at, updated_at")
+      .maybeSingle();
+    assertSupabaseOk(error, "benefits.update");
+    return data ? this.mapRow(data as Parameters<SupabaseBenefitRepository["mapRow"]>[0]) : null;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const { error, count } = await this.supabase.from("benefits").delete({ count: "exact" }).eq("id", id);
+    assertSupabaseOk(error, "benefits.delete");
+    return Boolean(count);
+  }
+}
+
 export function createSupabaseRepositories(supabase: SupabaseClient): Repositories {
   const profiles = new SupabaseProfileRepository(supabase);
+  const benefits = new SupabaseBenefitRepository(supabase);
   return {
     profiles,
     legalSpecialties: new SupabaseLegalSpecialtyRepository(supabase),
     geographies: new SupabaseGeographyRepository(supabase),
     lawyers: new SupabaseLawyerRepository(supabase, profiles),
     publicLawyerProfiles: new SupabasePublicLawyerProfileRepository(supabase),
-    lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase),
+    lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase, benefits),
     prayerRequests: new SupabasePrayerRequestRepository(supabase),
     lawyerMedia: new SupabaseLawyerMediaRepository(supabase),
     partnerLogos: new SupabasePartnerLogoRepository(supabase),
+    benefits,
     auditLogs: new SupabaseAuditLogRepository(supabase),
     matches: new SupabaseMatchRepository(supabase),
     matchEvents: new SupabaseMatchEventRepository(supabase),

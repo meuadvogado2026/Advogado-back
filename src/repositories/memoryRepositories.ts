@@ -1,7 +1,9 @@
-import type { CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
+import type { AdminBenefitCreate, AdminBenefitPatch, CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
 import { legalAreas } from "../modules/areas/legalAreas.js";
 import type {
   AuditLogRepository,
+  BenefitRecord,
+  BenefitRepository,
   CityRecord,
   GeographyRepository,
   LawyerDashboardRepository,
@@ -48,8 +50,19 @@ const prayerRequests: Array<{
   readAt?: string | null;
 }> = [];
 const partnerLogos: PartnerLogoRecord[] = [];
+const benefits: BenefitRecord[] = [];
 
 const seedCreatedAt = "2026-06-03T00:00:00.000Z";
+benefits.push({
+  id: "verified-profile",
+  title: "Perfil verificado",
+  description: "Presenca profissional no app com dados revisados pelo admin.",
+  badge: "MVP",
+  redemptionUrl: null,
+  active: true,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
+});
 
 function pageItems<T>(items: T[], input: PageInput): PageResult<T> {
   const start = (input.page - 1) * input.pageSize;
@@ -779,6 +792,8 @@ class MemoryMatchEventRepository implements MatchEventRepository {
 }
 
 class MemoryLawyerDashboardRepository implements LawyerDashboardRepository {
+  constructor(private readonly benefitRepository: BenefitRepository) {}
+
   async getByProfileId(profileId: string) {
     const profile = profiles.get(profileId);
     if (!profile || profile.role !== "lawyer") return null;
@@ -799,19 +814,13 @@ class MemoryLawyerDashboardRepository implements LawyerDashboardRepository {
         whatsappClicks: 0,
         contacts: 0
       },
-      benefits: [
-        {
-          id: "verified-profile",
-          title: "Perfil verificado",
-          description: "Presenca profissional no app com dados revisados pelo admin.",
-          badge: "MVP"
-        },
-        {
-          id: "external-whatsapp",
-          title: "Contato externo seguro",
-          description: "Atendimento segue pelo WhatsApp, sem chat interno no MVP."
-        }
-      ]
+      benefits: (await this.benefitRepository.listActive()).map((benefit) => ({
+        id: benefit.id,
+        title: benefit.title,
+        description: benefit.description,
+        ...(benefit.badge ? { badge: benefit.badge } : {}),
+        redemptionUrl: benefit.redemptionUrl ?? null
+      }))
     };
   }
 }
@@ -936,18 +945,74 @@ class MemoryPartnerLogoRepository implements PartnerLogoRepository {
   }
 }
 
+class MemoryBenefitRepository implements BenefitRepository {
+  async listAdmin() {
+    return [...benefits].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listAdminPage(input: PageInput) {
+    return pageItems(await this.listAdmin(), input);
+  }
+
+  async listActive() {
+    return (await this.listAdmin()).filter((benefit) => benefit.active);
+  }
+
+  async create(input: AdminBenefitCreate) {
+    const now = new Date().toISOString();
+    const benefit: BenefitRecord = {
+      id: crypto.randomUUID(),
+      title: input.title,
+      description: input.description,
+      badge: input.badge ?? null,
+      redemptionUrl: input.redemptionUrl ?? null,
+      active: input.active,
+      createdAt: now,
+      updatedAt: now
+    };
+    benefits.unshift(benefit);
+    return benefit;
+  }
+
+  async update(id: string, patch: AdminBenefitPatch) {
+    const index = benefits.findIndex((benefit) => benefit.id === id);
+    if (index === -1) return null;
+    const current = benefits[index]!;
+    const updated: BenefitRecord = {
+      ...current,
+      ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.badge !== undefined ? { badge: patch.badge ?? null } : {}),
+      ...(patch.redemptionUrl !== undefined ? { redemptionUrl: patch.redemptionUrl ?? null } : {}),
+      ...(patch.active !== undefined ? { active: patch.active } : {}),
+      updatedAt: new Date().toISOString()
+    };
+    benefits[index] = updated;
+    return updated;
+  }
+
+  async delete(id: string) {
+    const index = benefits.findIndex((benefit) => benefit.id === id);
+    if (index === -1) return false;
+    benefits.splice(index, 1);
+    return true;
+  }
+}
+
 export function createMemoryRepositories(): Repositories {
   const profileRepository = new MemoryProfileRepository();
+  const benefitRepository = new MemoryBenefitRepository();
   return {
     profiles: profileRepository,
     legalSpecialties: new MemoryLegalSpecialtyRepository(),
     geographies: new MemoryGeographyRepository(),
     lawyers: new MemoryLawyerRepository(profileRepository),
     publicLawyerProfiles: new MemoryPublicLawyerProfileRepository(),
-    lawyerDashboards: new MemoryLawyerDashboardRepository(),
+    lawyerDashboards: new MemoryLawyerDashboardRepository(benefitRepository),
     prayerRequests: new MemoryPrayerRequestRepository(),
     lawyerMedia: new MemoryLawyerMediaRepository(),
     partnerLogos: new MemoryPartnerLogoRepository(),
+    benefits: benefitRepository,
     auditLogs: new MemoryAuditLogRepository(),
     matches: new MemoryMatchRepository(),
     matchEvents: new MemoryMatchEventRepository(),

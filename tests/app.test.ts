@@ -1361,6 +1361,58 @@ describe("foundation API", () => {
     expect(list.json().pagination.total).toBeGreaterThanOrEqual(2);
   });
 
+  it("lets admin manage benefits and exposes active ones on lawyer dashboard", async () => {
+    const app = await buildApp();
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/admin/benefits",
+      headers: ADMIN,
+      payload: {
+        title: "Desconto em software juridico",
+        description: "Advogados cadastrados tem acesso a condicoes especiais para ferramentas de produtividade.",
+        badge: "Exclusivo",
+        redemptionUrl: "https://beneficios.example.test/software",
+        active: true
+      }
+    });
+    const inactive = await app.inject({
+      method: "POST",
+      url: "/v1/admin/benefits",
+      headers: ADMIN,
+      payload: {
+        title: "Beneficio pausado",
+        description: "Este beneficio nao deve aparecer no painel do advogado.",
+        active: false
+      }
+    });
+    const adminList = await app.inject({ method: "GET", url: "/v1/admin/benefits?page=1&pageSize=10", headers: ADMIN });
+    const dashboard = await app.inject({ method: "GET", url: "/v1/lawyer/me/dashboard", headers: LAWYER });
+    await app.close();
+
+    expect(create.statusCode).toBe(201);
+    expect(inactive.statusCode).toBe(201);
+    expect(adminList.statusCode).toBe(200);
+    expect(adminList.json().benefits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: "Desconto em software juridico", active: true }),
+        expect.objectContaining({ title: "Beneficio pausado", active: false })
+      ])
+    );
+    expect(dashboard.statusCode).toBe(200);
+    expect(dashboard.json().benefits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Desconto em software juridico",
+          badge: "Exclusivo",
+          redemptionUrl: "https://beneficios.example.test/software"
+        })
+      ])
+    );
+    expect(dashboard.json().benefits).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "Beneficio pausado" })])
+    );
+  });
+
   it("manages states and cities with duplicate and linked-delete protection", async () => {
     const repos = createMemoryRepositories();
     const app = await buildApp(repos);

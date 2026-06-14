@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { createAuthPreHandler } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
 import {
+  adminBenefitCreateSchema,
+  adminBenefitPatchSchema,
   adminImageUploadSchema,
   adminLawyerImageUploadSchema,
   adminPartnerLogoCreateSchema,
@@ -218,5 +220,83 @@ export async function registerAdminOperationRoutes(app: FastifyInstance, env: Ap
     });
 
     return reply.code(201).send({ partner, persistence: repositories.mode });
+  });
+
+  app.get("/admin/benefits", { preHandler: requireAdmin }, async (request) => {
+    const page = parsePagination(request.query);
+    if (!page) {
+      return {
+        benefits: await repositories.benefits.listAdmin(),
+        page: 1,
+        pageSize: 100,
+        persistence: repositories.mode
+      };
+    }
+
+    const result = await repositories.benefits.listAdminPage(page);
+    return {
+      benefits: result.items,
+      pagination: paginationMeta(page, result.total),
+      persistence: repositories.mode
+    };
+  });
+
+  app.post("/admin/benefits", { preHandler: requireAdmin }, async (request, reply) => {
+    const parsed = adminBenefitCreateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Beneficio invalido.", parsed.error.issues));
+    }
+
+    const benefit = await repositories.benefits.create(parsed.data);
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: "admin.benefits.create",
+      entityType: "benefit",
+      entityId: benefit.id,
+      metadata: { persistence: repositories.mode, active: benefit.active }
+    });
+
+    return reply.code(201).send({ benefit, persistence: repositories.mode });
+  });
+
+  app.patch("/admin/benefits/:id", { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = adminBenefitPatchSchema.safeParse(request.body);
+    if (!parsed.success || Object.keys(parsed.data).length === 0) {
+      return reply.code(422).send(apiError("VALIDATION_ERROR", "Atualizacao de beneficio invalida.", parsed.success ? [] : parsed.error.issues));
+    }
+
+    const benefit = await repositories.benefits.update(id, parsed.data);
+    if (!benefit) {
+      return reply.code(404).send(apiError("NOT_FOUND", "Beneficio nao encontrado."));
+    }
+
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: "admin.benefits.update",
+      entityType: "benefit",
+      entityId: benefit.id,
+      metadata: { persistence: repositories.mode, active: benefit.active }
+    });
+
+    return { benefit, persistence: repositories.mode };
+  });
+
+  app.delete("/admin/benefits/:id", { preHandler: requireAdmin }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const deleted = await repositories.benefits.delete(id);
+    if (!deleted) {
+      return reply.code(404).send(apiError("NOT_FOUND", "Beneficio nao encontrado."));
+    }
+
+    await repositories.auditLogs.record({
+      actorProfileId: request.currentUser?.id,
+      action: "admin.benefits.delete",
+      entityType: "benefit",
+      entityId: id,
+      metadata: { persistence: repositories.mode }
+    });
+
+    return reply.code(204).send();
   });
 }

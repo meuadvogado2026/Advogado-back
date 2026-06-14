@@ -1,4 +1,17 @@
-import type { AdminImageUpload, AdminLawyerImageUpload, AdminPartnerLogoCreate, CityCreate, CityPatch, LawyerCreate, LawyerPatch, PrayerRequest, StateCreate, StatePatch } from "../contracts/api.js";
+import type {
+  AdminBenefitCreate,
+  AdminBenefitPatch,
+  AdminImageUpload,
+  AdminLawyerImageUpload,
+  AdminPartnerLogoCreate,
+  CityCreate,
+  CityPatch,
+  LawyerCreate,
+  LawyerPatch,
+  PrayerRequest,
+  StateCreate,
+  StatePatch
+} from "../contracts/api.js";
 import type { GeocodeConfidence, GeocodePrecision, GeocodeProviderName } from "../modules/geocoding/geocodingService.js";
 import type { Role } from "../auth/types.js";
 
@@ -215,6 +228,7 @@ export type LawyerDashboard = {
     title: string;
     description: string;
     badge?: string;
+    redemptionUrl?: string | null;
   }>;
 };
 
@@ -278,6 +292,26 @@ export interface PartnerLogoRepository {
   listPublic(): Promise<PartnerLogoRecord[]>;
   create(input: AdminPartnerLogoCreate): Promise<PartnerLogoRecord>;
   uploadLogo(input: AdminImageUpload): Promise<StoredAdminImage>;
+}
+
+export type BenefitRecord = {
+  id: string;
+  title: string;
+  description: string;
+  badge?: string | null;
+  redemptionUrl?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export interface BenefitRepository {
+  listAdmin(): Promise<BenefitRecord[]>;
+  listAdminPage(input: PageInput): Promise<PageResult<BenefitRecord>>;
+  listActive(): Promise<BenefitRecord[]>;
+  create(input: AdminBenefitCreate): Promise<BenefitRecord>;
+  update(id: string, patch: AdminBenefitPatch): Promise<BenefitRecord | null>;
+  delete(id: string): Promise<boolean>;
 }
 
 export interface AuditLogRepository {
@@ -349,6 +383,7 @@ export type Repositories = {
   prayerRequests: PrayerRequestRepository;
   lawyerMedia: LawyerMediaRepository;
   partnerLogos: PartnerLogoRepository;
+  benefits: BenefitRepository;
   auditLogs: AuditLogRepository;
   matches: MatchRepository;
   matchEvents: MatchEventRepository;

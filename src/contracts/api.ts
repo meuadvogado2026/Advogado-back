@@ -122,6 +122,16 @@ export const adminPartnerLogoCreateSchema = z.object({
   active: z.boolean().default(true)
 });
 
+export const adminBenefitCreateSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  description: z.string().trim().min(3).max(600),
+  badge: z.string().trim().max(40).nullable().optional(),
+  redemptionUrl: safeHttpsUrlSchema.optional(),
+  active: z.boolean().default(true)
+});
+
+export const adminBenefitPatchSchema = adminBenefitCreateSchema.partial();
+
 export const clientSignupSchema = z.object({
   name: z.string().trim().min(3).max(120),
   email: z.string().trim().email(),
@@ -146,6 +156,8 @@ export type AdminPrayerRequestPatch = z.infer<typeof adminPrayerRequestPatchSche
 export type AdminImageUpload = z.infer<typeof adminImageUploadSchema>;
 export type AdminLawyerImageUpload = z.infer<typeof adminLawyerImageUploadSchema>;
 export type AdminPartnerLogoCreate = z.infer<typeof adminPartnerLogoCreateSchema>;
+export type AdminBenefitCreate = z.infer<typeof adminBenefitCreateSchema>;
+export type AdminBenefitPatch = z.infer<typeof adminBenefitPatchSchema>;
 export type ClientSignup = z.infer<typeof clientSignupSchema>;
 export type ChangePassword = z.infer<typeof changePasswordSchema>;
 export type StateCreate = z.infer<typeof stateCreateSchema>;
