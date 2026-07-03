@@ -6,9 +6,12 @@
   remoto. `SupabaseLawyerEventRepository` agora degrada erros especificos de
   migration ausente para metricas zeradas/evento nao registrado, evitando quebra
   do painel ate a aplicacao manual no SQL Editor. Gates locais: `npm run typecheck`,
-  teste focado de dashboard e `npm run harness` OK. Lacuna: aplicar `0015` no
-  Supabase remoto; tentativa local bloqueada porque `SUPABASE_DB_URL` atual nao e
-  URL Postgres e `psql` nao esta disponivel.
+  teste focado de dashboard e `npm run harness` OK. Pos-push: `npm run prod:smoke`
+  OK em producao, dashboard advogado voltou a `200`; sonda autenticada de
+  `POST /v1/lawyers/:id/events` retornou `200` com `recorded=false` enquanto a
+  migration aguarda. Lacuna: aplicar `0015` no Supabase remoto; tentativa local
+  bloqueada porque `SUPABASE_DB_URL` atual nao e URL Postgres e `psql` nao esta
+  disponivel.
 - 2026-07-03: insights do advogado implementados localmente. Nova rota
   `POST /v1/lawyers/:id/events` registra `profile_view` e `whatsapp_click` com
   payload minimo, auth e dedupe opcional; dashboard do advogado agrega metricas
