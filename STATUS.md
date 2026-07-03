@@ -1,5 +1,12 @@
 # Backend Status - Advogado 2.0
 
+- 2026-07-03: migration `0015_lawyer_events.sql` aplicada manualmente pelo usuario
+  no Supabase SQL Editor e validada em producao. Sonda autenticada registrou
+  `profile_view` e `whatsapp_click` com `201 recorded=true`, validou dedupe com
+  `200 duplicate=true` e dashboard do advogado agregou `profileViews=1`,
+  `whatsappClicks=1`, `contacts=1`, `conversionRate=1`; eventos de verificacao
+  foram limpos por `dedupe_key`. `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke`
+  OK apos a aplicacao.
 - 2026-07-03: hotfix pos-deploy dos insights publicado localmente. Smoke real
   confirmou backend Railway com rota nova no ar, mas dashboard do advogado retornou
   `500` enquanto a migration `0015_lawyer_events.sql` nao existe no Supabase
