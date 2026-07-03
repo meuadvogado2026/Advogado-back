@@ -1084,6 +1084,17 @@ function normalizeInsightMetrics(input: { profile_views?: number | string | null
   return { profileViews, whatsappClicks, contacts, conversionRate };
 }
 
+function isMissingLawyerEventsMigration(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  const message = String((error as { message?: string } | null)?.message ?? "");
+  return (
+    code === "42P01" ||
+    code === "42883" ||
+    code === "PGRST202" ||
+    /lawyer_events|lawyer_event_counts/i.test(message)
+  );
+}
+
 class SupabaseLawyerEventRepository implements LawyerEventRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -1098,6 +1109,9 @@ class SupabaseLawyerEventRepository implements LawyerEventRepository {
     if ((error as any)?.code === "23505") {
       return { recorded: false, duplicate: true };
     }
+    if (isMissingLawyerEventsMigration(error)) {
+      return { recorded: false };
+    }
     assertSupabaseOk(error, "lawyer_events.record");
     return { recorded: true };
   }
@@ -1108,6 +1122,9 @@ class SupabaseLawyerEventRepository implements LawyerEventRepository {
       p_lawyer_profile_id: lawyerProfileId,
       p_since: since.toISOString()
     });
+    if (isMissingLawyerEventsMigration(error)) {
+      return emptyInsightMetrics();
+    }
     assertSupabaseOk(error, "lawyer_events.metrics");
     const row = Array.isArray(data) ? data[0] : data;
     return row ? normalizeInsightMetrics(row as any) : emptyInsightMetrics();

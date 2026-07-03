@@ -1,5 +1,14 @@
 # Backend Status - Advogado 2.0
 
+- 2026-07-03: hotfix pos-deploy dos insights publicado localmente. Smoke real
+  confirmou backend Railway com rota nova no ar, mas dashboard do advogado retornou
+  `500` enquanto a migration `0015_lawyer_events.sql` nao existe no Supabase
+  remoto. `SupabaseLawyerEventRepository` agora degrada erros especificos de
+  migration ausente para metricas zeradas/evento nao registrado, evitando quebra
+  do painel ate a aplicacao manual no SQL Editor. Gates locais: `npm run typecheck`,
+  teste focado de dashboard e `npm run harness` OK. Lacuna: aplicar `0015` no
+  Supabase remoto; tentativa local bloqueada porque `SUPABASE_DB_URL` atual nao e
+  URL Postgres e `psql` nao esta disponivel.
 - 2026-07-03: insights do advogado implementados localmente. Nova rota
   `POST /v1/lawyers/:id/events` registra `profile_view` e `whatsapp_click` com
   payload minimo, auth e dedupe opcional; dashboard do advogado agrega metricas
