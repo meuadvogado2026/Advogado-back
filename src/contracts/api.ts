@@ -96,6 +96,12 @@ export const prayerRequestSchema = z.object({
   anonymous: z.boolean().default(true)
 });
 
+export const lawyerEventSchema = z.object({
+  eventType: z.enum(["profile_view", "whatsapp_click"]),
+  source: z.enum(["mobile", "landing", "admin", "unknown"]).default("unknown"),
+  dedupeKey: z.string().trim().min(8).max(160).optional()
+});
+
 export const adminUserPatchSchema = z.object({
   blocked: z.boolean()
 });
@@ -151,6 +157,7 @@ export type LawyerCreate = Omit<z.infer<typeof lawyerBaseSchema>, "serviceCityId
 export type LawyerPatch = z.infer<typeof lawyerPatchSchema>;
 export type GeocodeCep = z.infer<typeof geocodeCepSchema>;
 export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
+export type LawyerEvent = z.infer<typeof lawyerEventSchema>;
 export type AdminUserPatch = z.infer<typeof adminUserPatchSchema>;
 export type AdminPrayerRequestPatch = z.infer<typeof adminPrayerRequestPatchSchema>;
 export type AdminImageUpload = z.infer<typeof adminImageUploadSchema>;

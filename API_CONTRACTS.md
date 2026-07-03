@@ -5,7 +5,7 @@
 
 ## Spec 012 - Catalogo E Busca Por Cidade
 
-- `GET /v1/states` e `GET /v1/states/:stateId/cities`: somente ativos.
+- `GET /v1/states` e `GET /v1/states/:stateId/cities`: somente ativos e com ao menos um advogado elegivel para busca por cidade. O catalogo geografico nao filtra por area juridica; `areaIds` em query e ignorado por compatibilidade com clientes antigos.
 - CRUD `/v1/admin/states` e `/v1/admin/cities`: role `admin`; listagens retornam
   somente ativos; vinculo bloqueia delete; cidade nao exige centroide na UI.
 - `POST` de estado/cidade reativa o registro existente quando a chave unica esta
@@ -54,7 +54,7 @@ Resposta resumida de `POST /v1/match/by-city`:
 - `GET /v1/lawyers/:id` - implementado na spec 004; exige Bearer token (`client`, `lawyer` ou `admin`)
 - `GET /v1/partner-logos` - lista publica segura de logos ativas para rodape da Home mobile
 - `POST /v1/prayer-requests` - implementado na spec 008 Parte 3 e ampliado na spec 010; exige Bearer token `client` ou `lawyer`
-- `POST /v1/lawyers/:id/events`
+- `POST /v1/lawyers/:id/events` - registra insight seguro (`profile_view` ou `whatsapp_click`) sem telefone, mensagem, coordenada ou URL externa
 - `POST /v1/lawyers/:id/urgent-calls`
 
 ## Advogado
@@ -329,12 +329,43 @@ Resposta `200`:
     "planLabel": "MVP interno",
     "verified": true
   },
-  "metrics": { "profileViews": 0, "whatsappClicks": 0, "contacts": 0 },
+  "metrics": { "profileViews": 0, "whatsappClicks": 0, "contacts": 0, "conversionRate": 0 },
   "benefits": [{ "id": "uuid", "title": "Desconto em software", "description": "...", "badge": "VIP", "redemptionUrl": "https://..." }]
 }
 ```
 
-Metricas sao zeradas/placeholder seguro no MVP. Beneficios retornam somente registros ativos da tabela `benefits`.
+Metricas sao agregadas de `lawyer_events` por RPC `lawyer_event_counts`, com janela padrao de 30 dias e resposta de uma linha para reduzir egress. Beneficios retornam somente registros ativos da tabela `benefits`.
+
+## POST /v1/lawyers/:id/events
+
+Requer `Authorization: Bearer <token>` com role `client`, `lawyer` ou `admin`.
+
+Payload:
+
+```json
+{
+  "eventType": "profile_view",
+  "source": "mobile",
+  "dedupeKey": "opcional-por-sessao-ou-dia"
+}
+```
+
+`eventType`: `profile_view` ou `whatsapp_click`.
+`source`: `mobile`, `landing`, `admin` ou `unknown`.
+
+Resposta `201` quando gravado:
+
+```json
+{ "recorded": true }
+```
+
+Resposta `200` quando ignorado por deduplicacao:
+
+```json
+{ "recorded": false, "duplicate": true }
+```
+
+Nao salva telefone, mensagem de WhatsApp, URL externa, CEP, endereco completo ou coordenada.
 
 ## POST /v1/prayer-requests (spec 008 Parte 3)
 

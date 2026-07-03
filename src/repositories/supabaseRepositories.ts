@@ -7,6 +7,8 @@ import type {
   BenefitRecord,
   BenefitRepository,
   GeographyRepository,
+  LawyerEventRepository,
+  LawyerInsightMetrics,
   LawyerCoordinates,
   LawyerDashboard,
   LawyerDashboardRepository,
@@ -314,27 +316,10 @@ class SupabaseLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 class SupabaseGeographyRepository implements GeographyRepository {
   constructor(private readonly supabase: SupabaseClient) {}
-  private async resolveSpecialtyIds(areaIds: string[] = []) {
-    if (areaIds.length === 0) return [];
-    const uuidIds = areaIds.filter((areaId) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(areaId));
-    const slugs = areaIds.filter((areaId) => !uuidIds.includes(areaId));
-    const resolved = new Set(uuidIds);
-    if (slugs.length > 0) {
-      const { data, error } = await this.supabase
-        .from("legal_specialties")
-        .select("id")
-        .in("slug", slugs);
-      assertSupabaseOk(error, "geography.resolveSpecialtySlugs");
-      for (const row of data ?? []) resolved.add((row as { id: string }).id);
-    }
-    return [...resolved];
-  }
-
-  private async eligibleServiceCityIds(areaIds: string[] = []) {
-    const specialtyIds = await this.resolveSpecialtyIds(areaIds);
-    let query = this.supabase
+  private async eligibleServiceCityIds() {
+    const { data, error } = await this.supabase
       .from("lawyer_profiles")
-      .select("service_city_id, profiles!inner(blocked_at), lawyer_specialties!inner(specialty_id)")
+      .select("service_city_id, profiles!inner(blocked_at)")
       .eq("status", "approved")
       .eq("available_for_matches", true)
       .not("service_city_id", "is", null)
@@ -342,9 +327,6 @@ class SupabaseGeographyRepository implements GeographyRepository {
       .eq("office_geocode_confidence", "high")
       .in("office_geocode_precision", ["street", "manual"])
       .is("profiles.blocked_at", null);
-    if (areaIds.length > 0 && specialtyIds.length === 0) return [];
-    if (specialtyIds.length > 0) query = query.in("lawyer_specialties.specialty_id", specialtyIds);
-    const { data, error } = await query;
     assertSupabaseOk(error, "geography.eligibleServiceCityIds");
     return [...new Set((data ?? []).map((row: any) => row.service_city_id).filter(Boolean))] as string[];
   }
@@ -356,8 +338,8 @@ class SupabaseGeographyRepository implements GeographyRepository {
     assertSupabaseOk(error, "states.list");
     return (data ?? []).map((row: any) => ({ id: row.id, code: row.code, name: row.name, active: row.active, createdAt: row.created_at, updatedAt: row.updated_at }));
   }
-  async listStatesWithAvailableLawyers(areaIds: string[] = []) {
-    const cityIds = await this.eligibleServiceCityIds(areaIds);
+  async listStatesWithAvailableLawyers() {
+    const cityIds = await this.eligibleServiceCityIds();
     if (cityIds.length === 0) return [];
     const { data: citiesData, error: citiesError } = await this.supabase
       .from("cities")
@@ -419,8 +401,8 @@ class SupabaseGeographyRepository implements GeographyRepository {
     assertSupabaseOk(error, "cities.list");
     return (data ?? []).map((row: any) => ({ id: row.id, stateId: row.state_id, stateCode: Array.isArray(row.states) ? row.states[0]?.code : row.states?.code, name: row.name, active: row.active, center: { lat: Number(row.center_location?.coordinates?.[1] ?? 0), lng: Number(row.center_location?.coordinates?.[0] ?? 0) }, createdAt: row.created_at, updatedAt: row.updated_at }));
   }
-  async listCitiesWithAvailableLawyers(stateId: string, areaIds: string[] = []) {
-    const cityIds = await this.eligibleServiceCityIds(areaIds);
+  async listCitiesWithAvailableLawyers(stateId: string) {
+    const cityIds = await this.eligibleServiceCityIds();
     if (cityIds.length === 0) return [];
     const { data, error } = await this.supabase
       .from("cities")
@@ -1090,6 +1072,48 @@ class SupabaseMatchEventRepository implements MatchEventRepository {
   }
 }
 
+function emptyInsightMetrics(): LawyerInsightMetrics {
+  return { profileViews: 0, whatsappClicks: 0, contacts: 0, conversionRate: 0 };
+}
+
+function normalizeInsightMetrics(input: { profile_views?: number | string | null; whatsapp_clicks?: number | string | null; contacts?: number | string | null } | null): LawyerInsightMetrics {
+  const profileViews = Number(input?.profile_views ?? 0);
+  const whatsappClicks = Number(input?.whatsapp_clicks ?? 0);
+  const contacts = Number(input?.contacts ?? whatsappClicks);
+  const conversionRate = profileViews > 0 ? Number((whatsappClicks / profileViews).toFixed(2)) : 0;
+  return { profileViews, whatsappClicks, contacts, conversionRate };
+}
+
+class SupabaseLawyerEventRepository implements LawyerEventRepository {
+  constructor(private readonly supabase: SupabaseClient) {}
+
+  async record(input: Parameters<LawyerEventRepository["record"]>[0]) {
+    const { error } = await this.supabase.from("lawyer_events").insert({
+      lawyer_profile_id: input.lawyerProfileId,
+      actor_profile_id: input.actorProfileId ?? null,
+      event_type: input.eventType,
+      source: input.source,
+      dedupe_key: input.dedupeKey ?? null
+    });
+    if ((error as any)?.code === "23505") {
+      return { recorded: false, duplicate: true };
+    }
+    assertSupabaseOk(error, "lawyer_events.record");
+    return { recorded: true };
+  }
+
+  async getMetrics(lawyerProfileId: string, input: { since?: Date } = {}) {
+    const since = input.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const { data, error } = await this.supabase.rpc("lawyer_event_counts", {
+      p_lawyer_profile_id: lawyerProfileId,
+      p_since: since.toISOString()
+    });
+    assertSupabaseOk(error, "lawyer_events.metrics");
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? normalizeInsightMetrics(row as any) : emptyInsightMetrics();
+  }
+}
+
 type LawyerDashboardRow = {
   id: string;
   oab_number: string;
@@ -1100,7 +1124,8 @@ type LawyerDashboardRow = {
 class SupabaseLawyerDashboardRepository implements LawyerDashboardRepository {
   constructor(
     private readonly supabase: SupabaseClient,
-    private readonly benefitRepository: BenefitRepository
+    private readonly benefitRepository: BenefitRepository,
+    private readonly eventRepository: LawyerEventRepository
   ) {}
 
   async getByProfileId(profileId: string): Promise<LawyerDashboard | null> {
@@ -1127,11 +1152,7 @@ class SupabaseLawyerDashboardRepository implements LawyerDashboardRepository {
         planLabel: "MVP interno",
         verified: true
       },
-      metrics: {
-        profileViews: 0,
-        whatsappClicks: 0,
-        contacts: 0
-      },
+      metrics: await this.eventRepository.getMetrics(row.id),
       benefits: (await this.benefitRepository.listActive()).map((benefit) => ({
         id: benefit.id,
         title: benefit.title,
@@ -1522,13 +1543,15 @@ class SupabaseBenefitRepository implements BenefitRepository {
 export function createSupabaseRepositories(supabase: SupabaseClient): Repositories {
   const profiles = new SupabaseProfileRepository(supabase);
   const benefits = new SupabaseBenefitRepository(supabase);
+  const lawyerEvents = new SupabaseLawyerEventRepository(supabase);
   return {
     profiles,
     legalSpecialties: new SupabaseLegalSpecialtyRepository(supabase),
     geographies: new SupabaseGeographyRepository(supabase),
     lawyers: new SupabaseLawyerRepository(supabase, profiles),
     publicLawyerProfiles: new SupabasePublicLawyerProfileRepository(supabase),
-    lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase, benefits),
+    lawyerDashboards: new SupabaseLawyerDashboardRepository(supabase, benefits, lawyerEvents),
+    lawyerEvents,
     prayerRequests: new SupabasePrayerRequestRepository(supabase),
     lawyerMedia: new SupabaseLawyerMediaRepository(supabase),
     partnerLogos: new SupabasePartnerLogoRepository(supabase),

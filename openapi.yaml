@@ -242,6 +242,50 @@ paths:
           description: Role insuficiente
         "404":
           description: Perfil inexistente, nao aprovado ou indisponivel
+  /v1/lawyers/{id}/events:
+    post:
+      summary: Registra evento seguro de insight do advogado
+      description: Nao salva telefone, mensagem de WhatsApp, URL externa, CEP, endereco completo ou coordenada.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventType]
+              properties:
+                eventType:
+                  type: string
+                  enum: [profile_view, whatsapp_click]
+                source:
+                  type: string
+                  enum: [mobile, landing, admin, unknown]
+                  default: unknown
+                dedupeKey:
+                  type: string
+                  minLength: 8
+                  maxLength: 160
+      responses:
+        "201":
+          description: Evento registrado
+        "200":
+          description: Evento ignorado por deduplicacao
+        "401":
+          description: Token ausente ou invalido
+        "403":
+          description: Role insuficiente
+        "404":
+          description: Perfil inexistente, nao aprovado ou indisponivel
+        "422":
+          description: Payload invalido
   /v1/admin/lawyers:
     get:
       summary: Lista advogados cadastrados pelo admin
@@ -327,7 +371,7 @@ paths:
         - bearerAuth: []
       responses:
         "200":
-          description: Dashboard com metricas zeradas e beneficios estaticos
+          description: Dashboard com metricas agregadas e beneficios ativos
         "401":
           description: Token ausente ou invalido
         "403":

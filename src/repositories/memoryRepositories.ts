@@ -6,6 +6,8 @@ import type {
   BenefitRepository,
   CityRecord,
   GeographyRepository,
+  LawyerEventRepository,
+  LawyerInsightMetrics,
   LawyerDashboardRepository,
   LawyerMediaRepository,
   LawyerOfficeLocation,
@@ -48,6 +50,15 @@ const prayerRequests: Array<{
   status: "received" | "read";
   createdAt: string;
   readAt?: string | null;
+}> = [];
+const lawyerEvents: Array<{
+  id: string;
+  lawyerProfileId: string;
+  actorProfileId?: string;
+  eventType: "profile_view" | "whatsapp_click";
+  source: "mobile" | "landing" | "admin" | "unknown";
+  dedupeKey?: string;
+  createdAt: string;
 }> = [];
 const partnerLogos: PartnerLogoRecord[] = [];
 const benefits: BenefitRecord[] = [];
@@ -157,7 +168,7 @@ profiles.set("fixture-lawyer-sp-profile", {
 profiles.set("fixture-lawyer-rj-profile", {
   id: "fixture-lawyer-rj-profile",
   role: "lawyer",
-  name: "Dr. Bruno Costa",
+  name: "Dr. Costa",
   email: "fixture-lawyer-rj@example.test",
   phone: "21977776666",
   blockedAt: null,
@@ -343,14 +354,13 @@ class MemoryLegalSpecialtyRepository implements LegalSpecialtyRepository {
 
 const normalizeGeoName = (value: string) => value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-function isEligibleForCityCatalog(lawyer: LawyerRecord, areaIds: string[] = []) {
+function isEligibleForCityCatalog(lawyer: LawyerRecord) {
   return (
     lawyer.status === "approved" &&
     lawyer.availableForMatches !== false &&
     Boolean(lawyer.serviceCityId) &&
     profiles.get(lawyer.profileId)?.blockedAt == null &&
-    lawyer.officeLocationStatus === "validated" &&
-    (areaIds.length === 0 || [lawyer.mainAreaId, ...lawyer.secondaryAreaIds].some((area) => areaIds.includes(area)))
+    lawyer.officeLocationStatus === "validated"
   );
 }
 
@@ -358,10 +368,10 @@ class MemoryGeographyRepository implements GeographyRepository {
   async listStates(activeOnly = false) {
     return Array.from(states.values()).filter((state) => !activeOnly || state.active).sort((a, b) => a.name.localeCompare(b.name));
   }
-  async listStatesWithAvailableLawyers(areaIds: string[] = []) {
+  async listStatesWithAvailableLawyers() {
     const eligibleCityIds = new Set(
       Array.from(lawyers.values())
-        .filter((lawyer) => isEligibleForCityCatalog(lawyer, areaIds))
+        .filter((lawyer) => isEligibleForCityCatalog(lawyer))
         .map((lawyer) => lawyer.serviceCityId)
         .filter((cityId): cityId is string => Boolean(cityId))
     );
@@ -407,10 +417,10 @@ class MemoryGeographyRepository implements GeographyRepository {
   async listCities(stateId?: string, activeOnly = false) {
     return Array.from(cities.values()).filter((city) => (!stateId || city.stateId === stateId) && (!activeOnly || city.active)).sort((a, b) => a.name.localeCompare(b.name));
   }
-  async listCitiesWithAvailableLawyers(stateId: string, areaIds: string[] = []) {
+  async listCitiesWithAvailableLawyers(stateId: string) {
     const eligibleCityIds = new Set(
       Array.from(lawyers.values())
-        .filter((lawyer) => isEligibleForCityCatalog(lawyer, areaIds))
+        .filter((lawyer) => isEligibleForCityCatalog(lawyer))
         .map((lawyer) => lawyer.serviceCityId)
         .filter((cityId): cityId is string => Boolean(cityId))
     );
@@ -641,7 +651,7 @@ const matchFixtures: MatchFixture[] = [
   {
     id: "fixture-lawyer-rj",
     profileId: "fixture-lawyer-rj-profile",
-    name: "Dr. Bruno Costa",
+    name: "Dr. Costa",
     whatsapp: "21977776666",
     city: "Rio de Janeiro",
     state: "RJ",
@@ -672,6 +682,38 @@ const matchFixtures: MatchFixture[] = [
     officeGeocodeConfidence: "high"
   }
 ];
+
+lawyers.set("fixture-lawyer-dashboard", {
+  id: "fixture-lawyer-dashboard",
+  profileId: "test-lawyer-user",
+  name: "Dra. Teste",
+  email: "lawyer@example.test",
+  whatsapp: "11999999999",
+  oabNumber: "123456",
+  oabState: "SP",
+  mainAreaId: "civil",
+  secondaryAreaIds: [],
+  officeCep: "01001000",
+  officeNumber: "1",
+  serviceCityId: DEFAULT_CITY_ID,
+  availableForMatches: true,
+  status: "approved",
+  officeCity: "Brasilia",
+  officeState: "DF",
+  officeLat: DEFAULT_CITY_CENTER.lat,
+  officeLng: DEFAULT_CITY_CENTER.lng,
+  officeLocationPresent: true,
+  officeGeocodeProvider: "stub",
+  officeGeocodePrecision: "manual",
+  officeGeocodeConfidence: "high",
+  officeGeocodedAt: seedCreatedAt,
+  officeLocationStatus: "validated",
+  mustChangePassword: false,
+  accessInvitedAt: seedCreatedAt,
+  firstLoginCompletedAt: seedCreatedAt,
+  createdAt: seedCreatedAt,
+  updatedAt: seedCreatedAt
+});
 
 function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number) {
   const toRad = (value: number) => (value * Math.PI) / 180;
@@ -753,7 +795,37 @@ class MemoryMatchRepository implements MatchRepository {
 class MemoryPublicLawyerProfileRepository implements PublicLawyerProfileRepository {
   async getApprovedById(id: string) {
     const fixture = matchFixtures.find((candidate) => candidate.id === id && candidate.status === "approved");
-    if (!fixture) return null;
+    if (!fixture) {
+      const lawyer = lawyers.get(id);
+      const profile = lawyer ? profiles.get(lawyer.profileId) : null;
+      if (!lawyer || lawyer.status !== "approved" || profile?.blockedAt) return null;
+      return {
+        id: lawyer.id,
+        name: lawyer.name,
+        oabNumber: lawyer.oabNumber,
+        oabState: lawyer.oabState,
+        city: lawyer.officeCity ?? null,
+        state: lawyer.officeState ?? null,
+        areaIds: [lawyer.mainAreaId, ...lawyer.secondaryAreaIds],
+        areas: [lawyer.mainAreaId, ...lawyer.secondaryAreaIds].map((areaId) => ({
+          id: areaId,
+          name: legalAreas.find((area) => area.id === areaId)?.name ?? areaId
+        })),
+        whatsapp: lawyer.whatsapp,
+        verified: true as const,
+        avatarUrl: profile?.avatarUrl ?? null,
+        coverUrl: profile?.coverUrl ?? null,
+        miniBio: lawyer.miniBio ?? null,
+        fullBio: lawyer.fullBio ?? null,
+        instagramUrl: lawyer.instagramUrl ?? null,
+        linkedinUrl: lawyer.linkedinUrl ?? null,
+        facebookUrl: lawyer.facebookUrl ?? null,
+        websiteUrl: lawyer.websiteUrl ?? null,
+        yearsExperience: null,
+        planLabel: null,
+        emergencyAvailable: false
+      };
+    }
     if (profiles.get(fixture.profileId)?.blockedAt) return null;
 
     return {
@@ -791,29 +863,68 @@ class MemoryMatchEventRepository implements MatchEventRepository {
   }
 }
 
+function emptyInsightMetrics(): LawyerInsightMetrics {
+  return { profileViews: 0, whatsappClicks: 0, contacts: 0, conversionRate: 0 };
+}
+
+function metricsFromEvents(events: typeof lawyerEvents): LawyerInsightMetrics {
+  const profileViews = events.filter((event) => event.eventType === "profile_view").length;
+  const whatsappClicks = events.filter((event) => event.eventType === "whatsapp_click").length;
+  const conversionRate = profileViews > 0 ? Number((whatsappClicks / profileViews).toFixed(2)) : 0;
+  return { profileViews, whatsappClicks, contacts: whatsappClicks, conversionRate };
+}
+
+class MemoryLawyerEventRepository implements LawyerEventRepository {
+  async record(input: Parameters<LawyerEventRepository["record"]>[0]) {
+    if (input.dedupeKey && lawyerEvents.some((event) => event.dedupeKey === input.dedupeKey)) {
+      return { recorded: false, duplicate: true };
+    }
+    lawyerEvents.push({
+      id: crypto.randomUUID(),
+      lawyerProfileId: input.lawyerProfileId,
+      actorProfileId: input.actorProfileId,
+      eventType: input.eventType,
+      source: input.source,
+      dedupeKey: input.dedupeKey,
+      createdAt: new Date().toISOString()
+    });
+    return { recorded: true };
+  }
+
+  async getMetrics(lawyerProfileId: string, input: { since?: Date } = {}) {
+    const since = input.since?.getTime() ?? 0;
+    return metricsFromEvents(
+      lawyerEvents.filter(
+        (event) => event.lawyerProfileId === lawyerProfileId && new Date(event.createdAt).getTime() >= since
+      )
+    );
+  }
+}
+
 class MemoryLawyerDashboardRepository implements LawyerDashboardRepository {
-  constructor(private readonly benefitRepository: BenefitRepository) {}
+  constructor(
+    private readonly benefitRepository: BenefitRepository,
+    private readonly eventRepository: LawyerEventRepository
+  ) {}
 
   async getByProfileId(profileId: string) {
     const profile = profiles.get(profileId);
     if (!profile || profile.role !== "lawyer") return null;
+    const lawyer = Array.from(lawyers.values()).find((candidate) => candidate.profileId === profileId);
+    const lawyerId = lawyer?.id ?? "fixture-lawyer-dashboard";
 
     return {
       lawyer: {
-        id: "fixture-lawyer-dashboard",
+        id: lawyerId,
         name: profile.name,
-        oabNumber: "123456",
-        oabState: "SP",
+        oabNumber: lawyer?.oabNumber ?? "123456",
+        oabState: lawyer?.oabState ?? "SP",
         avatarUrl: profile.avatarUrl ?? null,
         coverUrl: profile.coverUrl ?? null,
         planLabel: "MVP interno",
         verified: true
       },
-      metrics: {
-        profileViews: 0,
-        whatsappClicks: 0,
-        contacts: 0
-      },
+      metrics: lawyer ? await this.eventRepository.getMetrics(lawyer.id) : emptyInsightMetrics(),
       benefits: (await this.benefitRepository.listActive()).map((benefit) => ({
         id: benefit.id,
         title: benefit.title,
@@ -1002,13 +1113,15 @@ class MemoryBenefitRepository implements BenefitRepository {
 export function createMemoryRepositories(): Repositories {
   const profileRepository = new MemoryProfileRepository();
   const benefitRepository = new MemoryBenefitRepository();
+  const lawyerEventRepository = new MemoryLawyerEventRepository();
   return {
     profiles: profileRepository,
     legalSpecialties: new MemoryLegalSpecialtyRepository(),
     geographies: new MemoryGeographyRepository(),
     lawyers: new MemoryLawyerRepository(profileRepository),
     publicLawyerProfiles: new MemoryPublicLawyerProfileRepository(),
-    lawyerDashboards: new MemoryLawyerDashboardRepository(benefitRepository),
+    lawyerDashboards: new MemoryLawyerDashboardRepository(benefitRepository, lawyerEventRepository),
+    lawyerEvents: lawyerEventRepository,
     prayerRequests: new MemoryPrayerRequestRepository(),
     lawyerMedia: new MemoryLawyerMediaRepository(),
     partnerLogos: new MemoryPartnerLogoRepository(),

@@ -1068,10 +1068,61 @@ describe("foundation API", () => {
       planLabel: "MVP interno",
       verified: true
     });
-    expect(body.metrics).toEqual({ profileViews: 0, whatsappClicks: 0, contacts: 0 });
+    expect(body.metrics).toEqual({ profileViews: 0, whatsappClicks: 0, contacts: 0, conversionRate: 0 });
     expect(body.benefits.length).toBeGreaterThan(0);
     expect(JSON.stringify(body)).not.toContain("officeCep");
     expect(JSON.stringify(body)).not.toContain("client_location");
+  });
+
+  it("records lawyer insight events and aggregates them on the dashboard", async () => {
+    const app = await buildApp();
+    const noAuth = await app.inject({
+      method: "POST",
+      url: "/v1/lawyers/fixture-lawyer-dashboard/events",
+      payload: { eventType: "profile_view", source: "mobile" }
+    });
+    const firstView = await app.inject({
+      method: "POST",
+      url: "/v1/lawyers/fixture-lawyer-dashboard/events",
+      headers: CLIENT,
+      payload: { eventType: "profile_view", source: "mobile", dedupeKey: "view:test-client-user:fixture-lawyer-dashboard:2026-07-03" }
+    });
+    const duplicateView = await app.inject({
+      method: "POST",
+      url: "/v1/lawyers/fixture-lawyer-dashboard/events",
+      headers: CLIENT,
+      payload: { eventType: "profile_view", source: "mobile", dedupeKey: "view:test-client-user:fixture-lawyer-dashboard:2026-07-03" }
+    });
+    const whatsappClick = await app.inject({
+      method: "POST",
+      url: "/v1/lawyers/fixture-lawyer-dashboard/events",
+      headers: CLIENT,
+      payload: { eventType: "whatsapp_click", source: "mobile", dedupeKey: "click:test-client-user:fixture-lawyer-dashboard:1" }
+    });
+    const invalid = await app.inject({
+      method: "POST",
+      url: "/v1/lawyers/fixture-lawyer-dashboard/events",
+      headers: CLIENT,
+      payload: { eventType: "phone_number_leak", source: "mobile" }
+    });
+    const dashboard = await app.inject({ method: "GET", url: "/v1/lawyer/me/dashboard", headers: LAWYER });
+    await app.close();
+
+    expect(noAuth.statusCode).toBe(401);
+    expect(firstView.statusCode).toBe(201);
+    expect(firstView.json()).toEqual({ recorded: true });
+    expect(duplicateView.statusCode).toBe(200);
+    expect(duplicateView.json()).toEqual({ recorded: false, duplicate: true });
+    expect(whatsappClick.statusCode).toBe(201);
+    expect(invalid.statusCode).toBe(422);
+    expect(dashboard.statusCode).toBe(200);
+    expect(dashboard.json().metrics).toMatchObject({
+      profileViews: 1,
+      whatsappClicks: 1,
+      contacts: 1
+    });
+    expect(dashboard.json().metrics.conversionRate).toBe(1);
+    expect(JSON.stringify(dashboard.json())).not.toContain("wa.me");
   });
 
   it("requires auth on prayer requests", async () => {
@@ -1487,10 +1538,18 @@ describe("foundation API", () => {
     expect(duplicateActiveState.statusCode).toBe(409);
   });
 
-  it("lists public states and cities only when they have eligible lawyers for the selected area", async () => {
+  it("lists public states and cities with eligible lawyers regardless of the selected area query", async () => {
     const repos = createMemoryRepositories();
     const emptyState = await repos.geographies.createState({ code: "MT", name: "Mato Grosso", active: true });
     await repos.geographies.createCity({ stateId: emptyState.id, name: "Cuiaba", active: true });
+    const laborState =
+      (await repos.geographies.listStates()).find((state) => state.code === "GO") ??
+      await repos.geographies.createState({ code: "GO", name: "Goias", active: true });
+    const laborStateCity = await repos.geographies.createCity({
+      stateId: laborState.id,
+      name: `Goiania Trabalhista ${Date.now()}`,
+      active: true
+    });
     const emptyCity = await repos.geographies.createCity({
       stateId: SERVICE_STATE_ID,
       name: `Cidade Sem Advogado ${Date.now()}`,
@@ -1518,6 +1577,14 @@ describe("foundation API", () => {
         geocode: { provider: "manual", precision: "manual", confidence: "high" }
       }
     );
+    await repos.lawyers.create(
+      { ...draftWithoutCoordinate({ name: "Dra. GO Trabalhista", email: `go-trab-${Date.now()}@example.test`, mainAreaId: "trabalhista", status: "approved" }), serviceCityId: laborStateCity.id, availableForMatches: true },
+      {
+        address: { city: "Goiania", state: "GO" },
+        coordinates: { lat: -16.68, lng: -49.25 },
+        geocode: { provider: "manual", precision: "manual", confidence: "high" }
+      }
+    );
 
     const app = await buildApp(repos);
     const states = await app.inject({ method: "GET", url: "/v1/states?areaIds=civil" });
@@ -1526,15 +1593,16 @@ describe("foundation API", () => {
 
     expect(states.statusCode).toBe(200);
     expect(states.json().states).toEqual([
-      expect.objectContaining({ id: SERVICE_STATE_ID, code: "DF" })
+      expect.objectContaining({ id: SERVICE_STATE_ID, code: "DF" }),
+      expect.objectContaining({ id: laborState.id, code: "GO" })
     ]);
     expect(states.json().states).not.toContainEqual(expect.objectContaining({ id: emptyState.id }));
     expect(cities.statusCode).toBe(200);
     expect(cities.json().cities).toEqual([
-      expect.objectContaining({ id: SERVICE_CITY_ID, name: "Brasilia" })
+      expect.objectContaining({ id: SERVICE_CITY_ID, name: "Brasilia" }),
+      expect.objectContaining({ id: laborCity.id })
     ]);
     expect(cities.json().cities).not.toContainEqual(expect.objectContaining({ id: emptyCity.id }));
-    expect(cities.json().cities).not.toContainEqual(expect.objectContaining({ id: laborCity.id }));
   });
 
   it("returns paginated city matches without client coordinates or fallback", async () => {

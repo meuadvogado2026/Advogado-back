@@ -1,5 +1,25 @@
 # Backend Status - Advogado 2.0
 
+- 2026-07-03: insights do advogado implementados localmente. Nova rota
+  `POST /v1/lawyers/:id/events` registra `profile_view` e `whatsapp_click` com
+  payload minimo, auth e dedupe opcional; dashboard do advogado agrega metricas
+  reais por `lawyer_event_counts` sem trazer eventos brutos. Migration
+  `0015_lawyer_events.sql` cria tabela, indices e RPC. Gates: teste focado falhou
+  antes e passou depois; `npm run typecheck`, `npm run test` (96), `npm run smoke`,
+  `npm run migration:check`, `npm run build` e `npm run harness` OK. Lacuna:
+  migration ainda nao aplicada no Supabase remoto.
+- 2026-06-25: catalogo publico de estados/cidades passou a ser independente da
+  area juridica selecionada. `GET /v1/states` e
+  `GET /v1/states/:stateId/cities` continuam retornando somente localidades ativas
+  com ao menos um advogado elegivel, mas agora ignoram `areaIds` em query por
+  compatibilidade com clientes antigos. O filtro por area permanece nos matches.
+  Gate: TDD focado falhou antes e passou depois; typecheck, teste focado, smoke e
+  harness backend OK.
+- 2026-06-19: fixtures/memoria do advogado RJ de teste renomeados para remover nome
+  proprio solicitado, sem alterar contrato, schema, rotas ou dados de producao.
+  Arquivos: `src/db/seeds/001_match_fixtures.sql` e
+  `src/repositories/memoryRepositories.ts`. Gate: `npm run harness` exit `0`
+  (typecheck, 95 testes, build, migration dry-run e smoke local).
 - 2026-06-12: hidratacao das listas de advogados paralelizada no commit
   `01ee531`, sem mudanca de contrato. Benchmark Railway com 7 amostras reduziu
   busca de `1443.8 ms` para `1281.6 ms` p95; todas as rotas permaneceram abaixo

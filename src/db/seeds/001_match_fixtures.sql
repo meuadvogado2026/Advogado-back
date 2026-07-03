@@ -38,7 +38,7 @@ on conflict do nothing;
 -- 2) Advogado aprovado no Rio de Janeiro, area trabalhista (controle de area distinta).
 with rj_profile as (
   insert into public.profiles (role, name, email, phone)
-  values ('lawyer', 'Dr. Bruno Costa (fixture)', 'fixture-lawyer-rj@example.test', '21977776666')
+  values ('lawyer', 'Dr. Costa (fixture)', 'fixture-lawyer-rj@example.test', '21977776666')
   on conflict (email) do update set name = excluded.name
   returning id
 ),

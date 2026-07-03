@@ -71,6 +71,18 @@
 - Admin inicial.
 - Areas juridicas.
 - Advogados fake para smoke.
+
+## lawyer_events
+
+Tabela de eventos leves para insights do advogado. Guarda somente
+`lawyer_profile_id`, `actor_profile_id` opcional, `event_type`, `source`,
+`dedupe_key` opcional e `created_at`.
+
+- Eventos permitidos: `profile_view`, `whatsapp_click`.
+- Nao armazena telefone, mensagem WhatsApp, URL externa, CEP, endereco completo
+  nem coordenada.
+- Agregacao do painel usa a funcao `lawyer_event_counts`, retornando uma linha
+  com visitas, cliques e contatos para reduzir egress no Supabase.
 - Beneficios/parceiros fake.
 
 ## Regras
