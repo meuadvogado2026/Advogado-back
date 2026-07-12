@@ -32,6 +32,12 @@ Dados sensiveis:
 - Minimizar persistencia de localizacao do cliente.
 - Permitir exclusao/anonimizacao conforme politica.
 - Separar dados operacionais de logs.
+- Exclusao de conta: o pedido e registrado com prazo de 15 dias corridos. O
+  e-mail fica restrito ao admin enquanto o pedido estiver aberto; nao deve ir
+  para logs. Antes de concluir, o operador deve excluir conta/credenciais,
+  perfil, midias, `match_events` e texto de `prayer_requests`, ou anonimizá-los
+  quando a eliminacao integral nao for tecnicamente possivel. O registro final
+  deve ser minimizado e nao reter conteudo sensivel.
 - Spec 007 implementa expurgo integral de `match_events` antigos apos 90 dias no MVP via comando backend. Dry-run nao altera dados; apply destrutivo exige confirmacao explicita e deve rodar somente em ambiente aprovado.
 
 ## Smoke De Seguranca

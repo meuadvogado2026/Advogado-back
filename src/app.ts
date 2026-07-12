@@ -11,6 +11,7 @@ import { registerGeographyRoutes } from "./modules/geography/routes.js";
 import { registerLawyerProfileRoutes } from "./modules/lawyerProfiles/routes.js";
 import { registerMatchRoutes } from "./modules/match/routes.js";
 import { registerSpec008Routes } from "./modules/spec008/routes.js";
+import { registerAccountDeletionRoutes } from "./modules/privacy/accountDeletionRoutes.js";
 import { createRepositories } from "./repositories/index.js";
 import type { Repositories } from "./repositories/types.js";
 
@@ -60,6 +61,7 @@ export async function buildApp(repositoriesOverride?: Repositories) {
     await registerAreaRoutes(v1, repositories.legalSpecialties);
     await registerGeographyRoutes(v1, env, repositories);
     await registerAuthRoutes(v1, env, repositories);
+    await registerAccountDeletionRoutes(v1, env, repositories);
     await registerMatchRoutes(v1, env, repositories);
     await registerLawyerProfileRoutes(v1, env, repositories);
     await registerSpec008Routes(v1, env, repositories);
