@@ -1,5 +1,17 @@
 # Backend Status - Advogado 2.0
 
+- 2026-07-25 Google OAuth cadastro explicito OK: `POST /v1/auth/oauth-client/complete`
+  agora diferencia login e cadastro pelo body `{ "createProfile": boolean }`.
+  Login Google sem `public.profiles` continua retornando `404 PROFILE_NOT_FOUND`
+  sem criar cadastro automatico. Cadastro Google explicito com
+  `createProfile: true` cria `profiles.role=client` usando a identidade OAuth
+  validada pelo Supabase. Perfil existente, inclusive advogado, segue retornando
+  sem conversao de role. Contratos atualizados em `API_CONTRACTS.md` e
+  `openapi.yaml`. Gates: teste focado Google OAuth passou, `npm run harness`
+  exit 0 com 100 testes/build/migration dry-run/smoke e
+  `npm audit --omit=dev --audit-level=high` exit 0. Ressalva: alertas de
+  tooling dev exigiriam `npm audit fix --force` e nao foram aplicados.
+
 - 2026-07-24 Google OAuth cliente local OK: nova rota
   `POST /v1/auth/oauth-client/complete` valida o Bearer token Supabase Auth,
   retorna profile existente sem converter role e bloqueia usuario com

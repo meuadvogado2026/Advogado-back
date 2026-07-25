@@ -144,6 +144,13 @@ export const clientSignupSchema = z.object({
   password: z.string().min(8).max(72)
 });
 
+export const oauthClientCompleteSchema = z.preprocess(
+  (value) => value ?? {},
+  z.object({
+    createProfile: z.boolean().default(false)
+  })
+);
+
 export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(72)
 });
@@ -166,6 +173,7 @@ export type AdminPartnerLogoCreate = z.infer<typeof adminPartnerLogoCreateSchema
 export type AdminBenefitCreate = z.infer<typeof adminBenefitCreateSchema>;
 export type AdminBenefitPatch = z.infer<typeof adminBenefitPatchSchema>;
 export type ClientSignup = z.infer<typeof clientSignupSchema>;
+export type OAuthClientComplete = z.infer<typeof oauthClientCompleteSchema>;
 export type ChangePassword = z.infer<typeof changePasswordSchema>;
 export type StateCreate = z.infer<typeof stateCreateSchema>;
 export type StatePatch = z.infer<typeof statePatchSchema>;

@@ -43,7 +43,7 @@ Resposta resumida de `POST /v1/match/by-city`:
 ## Auth/Profile
 
 - `POST /v1/auth/signup-client` - cadastro publico de cliente; cria Supabase Auth + `profiles.role=client` no backend
-- `POST /v1/auth/oauth-client/complete` - finaliza login Google validando Bearer Supabase Auth no backend; exige `profiles` existente e nao cria cadastro automatico
+- `POST /v1/auth/oauth-client/complete` - finaliza Google OAuth validando Bearer Supabase Auth no backend; login exige `profiles` existente e cadastro explicito pode criar `profiles.role=client`
 - `POST /v1/auth/change-password` - troca senha do usuario autenticado via backend; nao retorna senha/token
 - `GET /v1/me` - valida identidade/role e retorna estado seguro de primeiro acesso (`mustChangePassword`, `firstLoginCompletedAt`)
 - `PATCH /v1/me`
@@ -203,12 +203,34 @@ responde `422`; sem service role no backend Supabase responde `503`.
 Rota autenticada por `Authorization: Bearer <supabase-access-token>` apos login Google
 no Supabase Auth. O backend valida o token com Supabase server-side. Se ja existir
 `profiles.id = auth.users.id`, retorna a identidade existente sem alterar `role`.
-Se nao existir, retorna `404 PROFILE_NOT_FOUND` e nao cria cadastro automatico.
+Para entrada/login, o app envia `createProfile: false`; se nao existir profile,
+retorna `404 PROFILE_NOT_FOUND` e nao cria cadastro automatico. Para cadastro de
+cliente pelo botao Google, o app envia `createProfile: true`; nesse caso, se nao
+existir profile, o backend cria `profiles.role=client` usando o id/e-mail/nome do
+usuario OAuth validado.
+
+Request:
+
+```json
+{ "createProfile": false }
+```
+
+Cadastro Google explicito:
+
+```json
+{ "createProfile": true }
+```
 
 Resposta `200` quando o profile ja existir:
 
 ```json
 { "user": { "id": "...", "name": "Cliente Nome", "email": "cliente@example.com", "role": "client", "mustChangePassword": false, "firstLoginCompletedAt": null }, "persistence": "supabase" }
+```
+
+Resposta `201` quando `createProfile: true` cria o profile cliente:
+
+```json
+{ "user": { "id": "...", "name": "Cliente Nome", "email": "cliente@example.com", "role": "client" }, "persistence": "supabase" }
 ```
 
 Nao retorna token, refresh token, segredo Google, provider token ou senha. Usuario

@@ -444,6 +444,31 @@ describe("foundation API", () => {
     expect(JSON.stringify(response.json())).not.toContain("test-oauth-client");
   });
 
+  it("creates a client profile when Google OAuth is completed from signup mode", async () => {
+    const app = await buildApp();
+    const oauthToken = `test-oauth-client:oauth-signup-${Date.now()}:google-signup@example.test:Cliente Google Signup`;
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/oauth-client/complete",
+      headers: { authorization: `Bearer ${oauthToken}` },
+      payload: { createProfile: true }
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      user: {
+        email: "google-signup@example.test",
+        name: "Cliente Google Signup",
+        role: "client"
+      },
+      persistence: "memory"
+    });
+    expect(response.json().user.password).toBeUndefined();
+    expect(response.json().user.token).toBeUndefined();
+    expect(JSON.stringify(response.json())).not.toContain("test-oauth-client");
+  });
+
   it("completes Google OAuth for an existing client profile", async () => {
     const app = await buildApp();
     const response = await app.inject({

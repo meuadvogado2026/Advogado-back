@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createAuthPreHandler, extractBearerToken } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
-import { changePasswordSchema, clientSignupSchema } from "../../contracts/api.js";
+import { changePasswordSchema, clientSignupSchema, oauthClientCompleteSchema } from "../../contracts/api.js";
 import { apiError } from "../../lib/httpError.js";
 import { createSupabaseAdminClient } from "../../lib/supabase.js";
 import type { Repositories } from "../../repositories/types.js";
@@ -133,6 +133,13 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
   });
 
   app.post("/auth/oauth-client/complete", async (request, reply) => {
+    const parsed = oauthClientCompleteSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .code(422)
+        .send(apiError("VALIDATION_ERROR", "Dados de OAuth invalidos.", parsed.error.issues));
+    }
+
     const token = extractBearerToken(request);
     if (!token) {
       return reply.code(401).send(apiError("UNAUTHORIZED", "Token Bearer obrigatorio."));
@@ -165,6 +172,23 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
           role: existing.role,
           mustChangePassword: existing.mustChangePassword ?? false,
           firstLoginCompletedAt: existing.firstLoginCompletedAt ?? null
+        },
+        persistence: repositories.mode
+      });
+    }
+
+    if (parsed.data.createProfile) {
+      const profile = await repositories.profiles.createClientProfile({
+        id: identity.id,
+        name: identity.name,
+        email: identity.email
+      });
+      return reply.code(201).send({
+        user: {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          role: profile.role
         },
         persistence: repositories.mode
       });
