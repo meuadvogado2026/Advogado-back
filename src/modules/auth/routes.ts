@@ -1,10 +1,64 @@
 import type { FastifyInstance } from "fastify";
-import { createAuthPreHandler } from "../../auth/authMiddleware.js";
+import { createAuthPreHandler, extractBearerToken } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
 import { changePasswordSchema, clientSignupSchema } from "../../contracts/api.js";
 import { apiError } from "../../lib/httpError.js";
 import { createSupabaseAdminClient } from "../../lib/supabase.js";
 import type { Repositories } from "../../repositories/types.js";
+
+type OAuthIdentity = {
+  id: string;
+  email: string;
+  name: string;
+};
+
+function getNameFromMetadata(metadata: Record<string, unknown>, email: string) {
+  const name =
+    typeof metadata.name === "string"
+      ? metadata.name
+      : typeof metadata.full_name === "string"
+        ? metadata.full_name
+        : typeof metadata.display_name === "string"
+          ? metadata.display_name
+          : "";
+  return name.trim() || email.split("@")[0] || "Cliente";
+}
+
+async function resolveOAuthIdentity(token: string, env: AppEnv): Promise<OAuthIdentity | null> {
+  if (env.NODE_ENV === "test") {
+    if (token === env.TEST_AUTH_ADMIN_TOKEN) {
+      return { id: "test-admin-user", email: "admin@example.test", name: "Admin Teste" };
+    }
+    if (token === env.TEST_AUTH_CLIENT_TOKEN) {
+      return { id: "test-client-user", email: "client@example.test", name: "Cliente Teste" };
+    }
+    if (token === env.TEST_AUTH_LAWYER_TOKEN) {
+      return { id: "test-lawyer-user", email: "lawyer@example.test", name: "Dra. Teste" };
+    }
+    if (token.startsWith("test-oauth-client:")) {
+      const [, id, email, ...nameParts] = token.split(":");
+      if (!id || !email) return null;
+      return { id, email, name: nameParts.join(":") || "Cliente Google" };
+    }
+    return null;
+  }
+
+  const supabase = createSupabaseAdminClient(env);
+  if (!supabase) {
+    throw new Error("OAUTH_SUPABASE_AUSENTE");
+  }
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user?.id || !data.user.email) {
+    return null;
+  }
+
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    name: getNameFromMetadata(data.user.user_metadata ?? {}, data.user.email)
+  };
+}
 
 export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
   const requireAuthenticated = createAuthPreHandler(env, repositories);
@@ -76,6 +130,63 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
       await supabase.auth.admin.deleteUser(data.user.id);
       throw error;
     }
+  });
+
+  app.post("/auth/oauth-client/complete", async (request, reply) => {
+    const token = extractBearerToken(request);
+    if (!token) {
+      return reply.code(401).send(apiError("UNAUTHORIZED", "Token Bearer obrigatorio."));
+    }
+
+    let identity: OAuthIdentity | null;
+    try {
+      identity = await resolveOAuthIdentity(token, env);
+    } catch (error) {
+      if (error instanceof Error && error.message === "OAUTH_SUPABASE_AUSENTE") {
+        return reply.code(503).send(apiError("UPSTREAM_ERROR", "OAuth indisponivel sem credencial server-side."));
+      }
+      throw error;
+    }
+
+    if (!identity) {
+      return reply.code(401).send(apiError("UNAUTHORIZED", "Token OAuth invalido."));
+    }
+
+    const existing = await repositories.profiles.getById(identity.id);
+    if (existing) {
+      if (existing.blockedAt) {
+        return reply.code(403).send(apiError("FORBIDDEN", "Usuario bloqueado."));
+      }
+      return reply.code(200).send({
+        user: {
+          id: existing.id,
+          name: existing.name,
+          email: existing.email,
+          role: existing.role,
+          mustChangePassword: existing.mustChangePassword ?? false,
+          firstLoginCompletedAt: existing.firstLoginCompletedAt ?? null
+        },
+        persistence: repositories.mode
+      });
+    }
+
+    const profile = await repositories.profiles.createClientProfile({
+      id: identity.id,
+      name: identity.name,
+      email: identity.email
+    });
+
+    return reply.code(201).send({
+      user: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role,
+        mustChangePassword: profile.mustChangePassword ?? false,
+        firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null
+      },
+      persistence: repositories.mode
+    });
   });
 
   app.post("/auth/change-password", { preHandler: requireAuthenticated }, async (request, reply) => {
