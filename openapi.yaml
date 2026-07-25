@@ -49,15 +49,15 @@ paths:
           description: Cadastro indisponivel sem credencial server-side
   /v1/auth/oauth-client/complete:
     post:
-      summary: Finaliza cadastro/login cliente via OAuth
-      description: Valida o token Supabase Auth obtido via Google OAuth, cria profile client quando necessario e retorna identidade segura. Nao retorna token ou segredo.
+      summary: Finaliza login via Google OAuth
+      description: Valida o token Supabase Auth obtido via Google OAuth, retorna profile existente sem converter role e nao cria cadastro automatico. Nao retorna token ou segredo.
       security:
         - bearerAuth: []
       responses:
         "200":
           description: Perfil existente retornado sem conversao de role
-        "201":
-          description: Perfil client criado para usuario OAuth novo
+        "404":
+          description: Cadastro do app nao encontrado para o usuario Google
         "401":
           description: Token OAuth ausente ou invalido
         "403":

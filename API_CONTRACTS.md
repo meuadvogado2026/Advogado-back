@@ -43,7 +43,7 @@ Resposta resumida de `POST /v1/match/by-city`:
 ## Auth/Profile
 
 - `POST /v1/auth/signup-client` - cadastro publico de cliente; cria Supabase Auth + `profiles.role=client` no backend
-- `POST /v1/auth/oauth-client/complete` - finaliza login/cadastro Google validando Bearer Supabase Auth no backend; cria `profiles.role=client` somente quando nao ha profile existente
+- `POST /v1/auth/oauth-client/complete` - finaliza login Google validando Bearer Supabase Auth no backend; exige `profiles` existente e nao cria cadastro automatico
 - `POST /v1/auth/change-password` - troca senha do usuario autenticado via backend; nao retorna senha/token
 - `GET /v1/me` - valida identidade/role e retorna estado seguro de primeiro acesso (`mustChangePassword`, `firstLoginCompletedAt`)
 - `PATCH /v1/me`
@@ -203,16 +203,20 @@ responde `422`; sem service role no backend Supabase responde `503`.
 Rota autenticada por `Authorization: Bearer <supabase-access-token>` apos login Google
 no Supabase Auth. O backend valida o token com Supabase server-side. Se ja existir
 `profiles.id = auth.users.id`, retorna a identidade existente sem alterar `role`.
-Se nao existir, cria `profiles.role=client` com nome/e-mail do provedor.
+Se nao existir, retorna `404 PROFILE_NOT_FOUND` e nao cria cadastro automatico.
 
-Resposta `201` quando criar profile novo; `200` quando o profile ja existir:
+Resposta `200` quando o profile ja existir:
 
 ```json
 { "user": { "id": "...", "name": "Cliente Nome", "email": "cliente@example.com", "role": "client", "mustChangePassword": false, "firstLoginCompletedAt": null }, "persistence": "supabase" }
 ```
 
 Nao retorna token, refresh token, segredo Google, provider token ou senha. Usuario
-bloqueado recebe `403`.
+bloqueado recebe `403`. Usuario autenticado no Google sem cadastro no app recebe:
+
+```json
+{ "error": { "code": "PROFILE_NOT_FOUND", "message": "Cadastro nao encontrado para este login Google.", "details": [] } }
+```
 
 ## POST /v1/match (match real geoespacial)
 

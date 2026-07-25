@@ -2,12 +2,14 @@
 
 - 2026-07-24 Google OAuth cliente local OK: nova rota
   `POST /v1/auth/oauth-client/complete` valida o Bearer token Supabase Auth,
-  cria profile `client` somente para usuario OAuth novo, retorna profile
-  existente sem converter role e bloqueia usuario com `blockedAt`. Contratos
-  atualizados em `API_CONTRACTS.md` e `openapi.yaml`. Gates: `npm run test`
-  passou com 98 testes, `npm run typecheck` passou e `npm run harness` exit 0
-  incluindo build, migration dry-run e smoke. Lacuna: smoke real em producao
-  depende de executar login Google pelo app/mobile apos publicacao/build.
+  retorna profile existente sem converter role e bloqueia usuario com
+  `blockedAt`. Ajuste de 2026-07-24 removeu o cadastro automatico via Google:
+  usuario OAuth sem `public.profiles` agora recebe `404 PROFILE_NOT_FOUND` e
+  nenhum profile `client` e criado. Contratos atualizados em `API_CONTRACTS.md`
+  e `openapi.yaml`. Gates: `npm run test` passou com 99 testes, `npm run
+  typecheck` passou e `npm run harness` exit 0 incluindo build, migration
+  dry-run e smoke. Lacuna: smoke real em producao depende de executar login
+  Google pelo app/mobile apos publicacao/build.
 
 - 2026-07-12 Spec 016: cobertura Vitest e CI configuradas. `npm run test:coverage`,
   typecheck, build e audit de dependencias de producao passaram; 96 testes, baseline
