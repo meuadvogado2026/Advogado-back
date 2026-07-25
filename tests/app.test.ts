@@ -424,33 +424,44 @@ describe("foundation API", () => {
     expect(response.json().user.token).toBeUndefined();
   });
 
-  it("completes Google OAuth by creating an idempotent client profile through the backend", async () => {
+  it("rejects Google OAuth when the authenticated user has no application profile", async () => {
     const app = await buildApp();
     const oauthToken = `test-oauth-client:oauth-client-${Date.now()}:google-client@example.test:Cliente Google`;
-    const first = await app.inject({
-      method: "POST",
-      url: "/v1/auth/oauth-client/complete",
-      headers: { authorization: `Bearer ${oauthToken}` }
-    });
-    const second = await app.inject({
+    const response = await app.inject({
       method: "POST",
       url: "/v1/auth/oauth-client/complete",
       headers: { authorization: `Bearer ${oauthToken}` }
     });
     await app.close();
 
-    expect(first.statusCode).toBe(201);
-    expect(second.statusCode).toBe(200);
-    expect(first.json()).toMatchObject({
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "PROFILE_NOT_FOUND",
+        message: "Cadastro nao encontrado para este login Google."
+      }
+    });
+    expect(JSON.stringify(response.json())).not.toContain("test-oauth-client");
+  });
+
+  it("completes Google OAuth for an existing client profile", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/oauth-client/complete",
+      headers: CLIENT
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
       user: {
-        email: "google-client@example.test",
-        name: "Cliente Google",
+        id: "test-client-user",
+        email: "client@example.test",
         role: "client"
       },
       persistence: "memory"
     });
-    expect(second.json().user).toMatchObject(first.json().user);
-    expect(JSON.stringify(first.json())).not.toContain("test-oauth-client");
   });
 
   it("does not convert an existing lawyer profile during OAuth completion", async () => {

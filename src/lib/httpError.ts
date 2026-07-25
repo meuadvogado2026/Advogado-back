@@ -1,6 +1,7 @@
 export type ApiErrorCode =
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
+  | "PROFILE_NOT_FOUND"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "CONFLICT"

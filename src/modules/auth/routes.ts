@@ -170,23 +170,9 @@ export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repo
       });
     }
 
-    const profile = await repositories.profiles.createClientProfile({
-      id: identity.id,
-      name: identity.name,
-      email: identity.email
-    });
-
-    return reply.code(201).send({
-      user: {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        role: profile.role,
-        mustChangePassword: profile.mustChangePassword ?? false,
-        firstLoginCompletedAt: profile.firstLoginCompletedAt ?? null
-      },
-      persistence: repositories.mode
-    });
+    return reply
+      .code(404)
+      .send(apiError("PROFILE_NOT_FOUND", "Cadastro nao encontrado para este login Google."));
   });
 
   app.post("/auth/change-password", { preHandler: requireAuthenticated }, async (request, reply) => {
