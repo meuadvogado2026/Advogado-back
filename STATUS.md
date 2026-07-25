@@ -1,5 +1,20 @@
 # Backend Status - Advogado 2.0
 
+- 2026-07-24 Google OAuth cliente local OK: nova rota
+  `POST /v1/auth/oauth-client/complete` valida o Bearer token Supabase Auth,
+  cria profile `client` somente para usuario OAuth novo, retorna profile
+  existente sem converter role e bloqueia usuario com `blockedAt`. Contratos
+  atualizados em `API_CONTRACTS.md` e `openapi.yaml`. Gates: `npm run test`
+  passou com 98 testes, `npm run typecheck` passou e `npm run harness` exit 0
+  incluindo build, migration dry-run e smoke. Lacuna: smoke real em producao
+  depende de executar login Google pelo app/mobile apos publicacao/build.
+
+- 2026-07-12 Spec 016: cobertura Vitest e CI configuradas. `npm run test:coverage`,
+  typecheck, build e audit de dependencias de producao passaram; 96 testes, baseline
+  55,13% linhas/statements, 58,06% funcoes e 73,77% branches. Meta de 100% permanece
+  aberta para auth/privacidade, rotas admin, Supabase repositories e ramos negativos.
+  Logs Pino/Fastify em producao mantem redacao de PII/secrets; sem deploy remoto.
+
 - 2026-07-03: migration `0015_lawyer_events.sql` aplicada manualmente pelo usuario
   no Supabase SQL Editor e validada em producao. Sonda autenticada registrou
   `profile_view` e `whatsapp_click` com `201 recorded=true`, validou dedupe com

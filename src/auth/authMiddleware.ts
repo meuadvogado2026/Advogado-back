@@ -5,7 +5,7 @@ import { createSupabaseAdminClient } from "../lib/supabase.js";
 import type { Repositories } from "../repositories/types.js";
 import type { Role } from "./types.js";
 
-function extractBearerToken(request: FastifyRequest) {
+export function extractBearerToken(request: FastifyRequest) {
   const header = request.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     return null;

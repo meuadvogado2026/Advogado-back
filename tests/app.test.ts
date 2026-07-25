@@ -424,6 +424,52 @@ describe("foundation API", () => {
     expect(response.json().user.token).toBeUndefined();
   });
 
+  it("completes Google OAuth by creating an idempotent client profile through the backend", async () => {
+    const app = await buildApp();
+    const oauthToken = `test-oauth-client:oauth-client-${Date.now()}:google-client@example.test:Cliente Google`;
+    const first = await app.inject({
+      method: "POST",
+      url: "/v1/auth/oauth-client/complete",
+      headers: { authorization: `Bearer ${oauthToken}` }
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/v1/auth/oauth-client/complete",
+      headers: { authorization: `Bearer ${oauthToken}` }
+    });
+    await app.close();
+
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({
+      user: {
+        email: "google-client@example.test",
+        name: "Cliente Google",
+        role: "client"
+      },
+      persistence: "memory"
+    });
+    expect(second.json().user).toMatchObject(first.json().user);
+    expect(JSON.stringify(first.json())).not.toContain("test-oauth-client");
+  });
+
+  it("does not convert an existing lawyer profile during OAuth completion", async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/oauth-client/complete",
+      headers: LAWYER
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user).toMatchObject({
+      id: "test-lawyer-user",
+      email: "lawyer@example.test",
+      role: "lawyer"
+    });
+  });
+
   it("fails production repository setup instead of falling back to memory when Supabase is not configured", () => {
     const env = loadEnv({
       NODE_ENV: "production",
