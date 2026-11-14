@@ -385,7 +385,13 @@ export interface MatchEventRepository {
   record(input: MatchEventInput): Promise<void>;
 }
 
+export type AdminOperationSnapshot = {
+  prayers: { pending: number; read: number };
+  partners: { active: number; inactive: number };
+  benefits: { active: number; inactive: number };
+};
 export type AdminDashboardSnapshot = {
+  operations: AdminOperationSnapshot;
   profiles: Array<{ id: string; role: Role; blockedAt: string | null; createdAt: string | null }>;
   lawyers: Array<{ id: string; profileId: string; status: LawyerRecord["status"]; serviceCityId: string | null; availableForMatches: boolean; hasOfficeLocation: boolean; confidence: string | null; precision: string | null }>;
   cities: Array<{ id: string; stateId: string; name: string; active: boolean }>;
