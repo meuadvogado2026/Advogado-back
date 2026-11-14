@@ -1129,6 +1129,14 @@ export function createMemoryRepositories(): Repositories {
     auditLogs: new MemoryAuditLogRepository(),
     matches: new MemoryMatchRepository(),
     matchEvents: new MemoryMatchEventRepository(),
+    adminDashboard: { async snapshot() {
+      return {
+        profiles: Array.from(profiles.values()).map(p => ({ id: p.id, role: p.role, createdAt: p.createdAt ?? null, blockedAt: p.blockedAt ?? null })),
+        lawyers: Array.from(lawyers.values()).map(l => ({ id: l.id, profileId: l.profileId, status: l.status, serviceCityId: l.serviceCityId ?? null, availableForMatches: l.availableForMatches !== false, hasOfficeLocation: l.officeLocationStatus === "validated", confidence: l.officeLocationStatus === "validated" ? "high" : null, precision: l.officeLocationStatus === "validated" ? "manual" : null })),
+        cities: Array.from(cities.values()).map(c => ({ id: c.id, stateId: c.stateId, name: c.name, active: c.active })),
+        states: Array.from(states.values()).map(s => ({ id: s.id, code: s.code, name: s.name, active: s.active }))
+      };
+    } },
     mode: "memory"
   };
 }
