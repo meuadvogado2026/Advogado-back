@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 
-const REQUIRED_CORS_ORIGINS = ["https://advogado20admin.vercel.app"];
+const REQUIRED_CORS_ORIGINS = ["https://advogado20admin.vercel.app", "https://admin.advogado20.com.br"];
 
 const workspaceEnvPath = resolve(process.cwd(), "..", ".env");
 const localEnvPath = resolve(process.cwd(), ".env");
