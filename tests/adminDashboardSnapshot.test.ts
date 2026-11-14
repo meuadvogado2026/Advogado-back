@@ -17,8 +17,8 @@ describe("dashboard complete minimal snapshot",()=>{
  });
  it("does not select contact data or return geography/identity payloads in snapshot output",async()=>{
   const selections:string[]=[];
-  const client={from:()=>({select:(columns:string)=>{selections.push(columns);return {order:()=>({range:async()=>({data:[],error:null,count:0})})};}})} as unknown as SupabaseClient;
-  expect(await createSupabaseDashboardRepository(client).snapshot()).toEqual({profiles:[],lawyers:[],cities:[],states:[]});
+  const client={from:()=>({select:(columns:string)=>{selections.push(columns);return {order:()=>({range:async()=>({data:[],error:null,count:0})}),eq:async()=>({data:null,error:null,count:0})};}})} as unknown as SupabaseClient;
+  expect(await createSupabaseDashboardRepository(client).snapshot()).toEqual({profiles:[],lawyers:[],cities:[],states:[],operations:{prayers:{pending:0,read:0},partners:{active:0,inactive:0},benefits:{active:0,inactive:0}}});
   expect(selections.join(",")).not.toMatch(/email|phone|password|whatsapp|office_cep|prayer|message/);
  });
  it("fails on an incomplete response rather than spinning forever",async()=>{

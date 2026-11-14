@@ -6,6 +6,7 @@ const now = new Date("2026-11-14T12:00:00Z");
 const profile = (id:string, role:"client"|"lawyer"|"admin"="lawyer", createdAt="2026-11-01T12:00:00Z") => ({id,role,createdAt,blockedAt:null});
 function fixture(): DashboardSnapshot {
  return {
+  operations:{prayers:{pending:2,read:3},partners:{active:1,inactive:2},benefits:{active:3,inactive:0}},
   profiles:[profile("client","client"),profile("admin","admin"),profile("l1"),profile("l2"),{...profile("l3"),blockedAt:"2026-11-10"}],
   states:[{id:"sp",code:"SP",name:"São Paulo",active:true},{id:"df",code:"DF",name:"Distrito Federal",active:true}],
   cities:[{id:"city-sp",stateId:"sp",name:"São Paulo",active:true},{id:"city-df",stateId:"df",name:"Brasília",active:true},{id:"empty",stateId:"sp",name:"Campinas",active:true}],
@@ -20,6 +21,13 @@ describe("admin dashboard aggregates",()=>{
   expect(d.users).toMatchObject({total:4,clients:1,lawyerAccounts:3,blocked:1,newLast30Days:4});
   expect(d.lawyers).toMatchObject({total:3,available:1,approvedUnavailable:1,statuses:{approved:2,pending_review:1,draft:0}});
  });
+ it("summarizes operation totals and percentages without calling read requests answered",()=>{
+  const d=buildAdminDashboard(fixture(),now);
+  expect(d.operations.prayers).toEqual({total:5,pending:2,read:3,readPercentage:60});
+  expect(d.operations.partners).toEqual({total:3,active:1,inactive:2,activePercentage:33.3});
+  expect(d.operations.benefits).toEqual({total:3,active:3,inactive:0,activePercentage:100});
+  expect(d.operations.prayers).not.toHaveProperty("answered");
+ });
  it("uses service city for regions with the full denominator and an unknown bucket",()=>{
   const d=buildAdminDashboard(fixture(),now);
   expect(d.regions.find(r=>r.name==="Sudeste")).toMatchObject({count:1,percentage:33.3});
@@ -28,8 +36,8 @@ describe("admin dashboard aggregates",()=>{
   expect(d.coverage).toMatchObject({activeCities:3,servedCities:1,unservedCities:2,percentage:33.3,servedStates:1});
  });
  it("returns zero metrics without NaN for an empty database",()=>{
-  const d=buildAdminDashboard({profiles:[],lawyers:[],cities:[],states:[]},now);
-  expect(d.users.total).toBe(0);expect(d.coverage.percentage).toBe(0);expect(d.regions.every(r=>r.percentage===0)).toBe(true);
+  const d=buildAdminDashboard({profiles:[],lawyers:[],cities:[],states:[],operations:{prayers:{pending:0,read:0},partners:{active:0,inactive:0},benefits:{active:0,inactive:0}}},now);
+  expect(d.operations.prayers.readPercentage).toBe(0);expect(d.operations.partners.activePercentage).toBe(0);expect(d.operations.benefits.activePercentage).toBe(0);expect(d.users.total).toBe(0);expect(d.coverage.percentage).toBe(0);expect(d.regions.every(r=>r.percentage===0)).toBe(true);
  });
  it.each(["blocked","unavailable","cityInactive","stateInactive","lowPrecision","missingProfile"])("does not count %s as coverage",condition=>{
   const f=fixture();
@@ -50,7 +58,7 @@ describe("admin dashboard aggregates",()=>{
  });
  it("exposes only aggregate data to the admin and no raw identities",async()=>{
   const repos=createMemoryRepositories();vi.spyOn(repos.adminDashboard,"snapshot").mockResolvedValue(fixture());
-  const app=await buildApp(repos);try{const r=await app.inject({method:"GET",url:"/v1/admin/dashboard",headers:{authorization:"Bearer test-admin-token"}});expect(r.statusCode).toBe(200);expect(r.headers["cache-control"]).toContain("no-store");const text=r.body;expect(text).not.toMatch(/profileId|blockedAt|serviceCityId|office_location|email|phone|prayer|coordinates/);expect(r.json().lawyers.total).toBe(3);}finally{await app.close();}
+  const app=await buildApp(repos);try{const r=await app.inject({method:"GET",url:"/v1/admin/dashboard",headers:{authorization:"Bearer test-admin-token"}});expect(r.statusCode).toBe(200);expect(r.headers["cache-control"]).toContain("no-store");const text=r.body;expect(text).not.toMatch(/profileId|blockedAt|serviceCityId|office_location|email|phone|message|clientName|coordinates/);expect(r.json().lawyers.total).toBe(3);}finally{await app.close();}
  });
  it("returns a clear failure instead of plausible zero totals on a database error",async()=>{
   const repos=createMemoryRepositories();vi.spyOn(repos.adminDashboard,"snapshot").mockRejectedValue(new Error("database unavailable"));

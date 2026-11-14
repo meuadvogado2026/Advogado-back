@@ -1131,6 +1131,11 @@ export function createMemoryRepositories(): Repositories {
     matchEvents: new MemoryMatchEventRepository(),
     adminDashboard: { async snapshot() {
       return {
+        operations: {
+          prayers: { pending: prayerRequests.filter(p => p.status === "received").length, read: prayerRequests.filter(p => p.status === "read").length },
+          partners: { active: partnerLogos.filter(p => p.active).length, inactive: partnerLogos.filter(p => !p.active).length },
+          benefits: { active: benefits.filter(b => b.active).length, inactive: benefits.filter(b => !b.active).length }
+        },
         profiles: Array.from(profiles.values()).map(p => ({ id: p.id, role: p.role, createdAt: p.createdAt ?? null, blockedAt: p.blockedAt ?? null })),
         lawyers: Array.from(lawyers.values()).map(l => ({ id: l.id, profileId: l.profileId, status: l.status, serviceCityId: l.serviceCityId ?? null, availableForMatches: l.availableForMatches !== false, hasOfficeLocation: l.officeLocationStatus === "validated", confidence: l.officeLocationStatus === "validated" ? "high" : null, precision: l.officeLocationStatus === "validated" ? "manual" : null })),
         cities: Array.from(cities.values()).map(c => ({ id: c.id, stateId: c.stateId, name: c.name, active: c.active })),

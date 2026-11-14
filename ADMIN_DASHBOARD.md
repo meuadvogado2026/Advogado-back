@@ -12,3 +12,8 @@ Fonte: analise direta do codigo local, 2026-11-14, SPEC-022/ADR-016/CON-022.
 - Admin filtra catalogo completo por estado/nome sem acento/situacao, com paginacao local apos filtro. Cidade existente nao e recriada; reativacao permanece explicita porPATCH.
 
 Gates: Harness back/admin, Vitest agregacao/snapshot/roles/PII/filtros; scripts/admin-regression.cjs Chrome com fixtures para loading/falha/zero/prioridades/cidades e responsividade. Smoke real compara totais com fontes paginadas apos rolloutAPI/admin. Rollback: reverter codigo sem dados/schema a restaurar.
+
+
+## SPEC-023 - Operacao no dashboard / 2026-11-14
+
+CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e benefits(total,active,inactive,activePercentage). Snapshot repo conta apenas HEAD/count exact porstatus e active; nao carrega texto/autor/midia/descricao. Sem limite de primeira pagina e sem migration. Status de oracao continuam received/read, como confirmado pelo usuario; lida nao e respondida. Qualquer erro no contador aborta snapshot502. Memoria tem mesmo contrato. Harness137 testes/tipos/build/smoke OK.

@@ -41,10 +41,20 @@ export function buildAdminDashboard(snapshot: DashboardSnapshot, now = new Date(
   const since = now.getTime() - 30 * 24 * 60 * 60 * 1000;
   return {
     generatedAt: now.toISOString(),
+    operations: {
+      prayers: { total: snapshot.operations.prayers.pending + snapshot.operations.prayers.read, ...snapshot.operations.prayers, readPercentage: percentage(snapshot.operations.prayers.read, snapshot.operations.prayers.pending + snapshot.operations.prayers.read) },
+      partners: summarizeActivity(snapshot.operations.partners),
+      benefits: summarizeActivity(snapshot.operations.benefits)
+    },
     users: { total: appUsers.length, clients: appUsers.filter(p => p.role === "client").length, lawyerAccounts: appUsers.filter(p => p.role === "lawyer").length, blocked: appUsers.filter(p => p.blockedAt).length, newLast30Days: appUsers.filter(p => { const t = p.createdAt ? Date.parse(p.createdAt) : NaN; return t >= since && t <= now.getTime(); }).length },
     lawyers: { total: lawyers.length, available, approvedUnavailable: totals.approved - available, statuses: totals },
     coverage: { activeCities, servedCities: servedCities.size, unservedCities: activeCities - servedCities.size, percentage: percentage(servedCities.size, activeCities), servedStates: servedStates.size },
     regions: Array.from(regionCounts, ([name, count]) => ({ name, count, percentage: percentage(count, lawyers.length) })),
     states: Array.from(stateCounts.values()).map(row => ({ ...row, percentage: percentage(row.count, lawyers.length) })).sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
   };
+}
+
+function summarizeActivity(counts: { active: number; inactive: number }) {
+  const total = counts.active + counts.inactive;
+  return { total, ...counts, activePercentage: percentage(counts.active, total) };
 }

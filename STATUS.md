@@ -270,3 +270,8 @@ GET /v1/admin/cities aceita includeInactive=true apenas para admin; padrao prese
 ## SPEC-022 - Dashboard e consulta por estado / 2026-11-14
 
 GET /v1/admin/dashboard exige role admin e retorna somente agregados com Cache-Control private/no-store. Snapshot minimal de profiles/lawyer_profiles/cities/states percorre todas as paginas porID, count exact e tamanho efetivo devolvido. Service separa usuarios do app (client+lawyer, sem admin), clientes, contaslawyer, novos30dias, cadastros porstatus, elegiveis e cidades/regioes/UF. Regiao usa cidade de atendimento, nao OAB/localizacao de cliente; Nao informado incluido no denominador. Erro parcial retorna502, nao zero. Sem migration. Harness131 testes/tipos/build/smoke OK; publicar antesadmin.
+
+
+## SPEC-023 - Operacao no dashboard / 2026-11-14
+
+CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e benefits(total,active,inactive,activePercentage). Snapshot repo conta apenas HEAD/count exact porstatus e active; nao carrega texto/autor/midia/descricao. Sem limite de primeira pagina e sem migration. Status de oracao continuam received/read, como confirmado pelo usuario; lida nao e respondida. Qualquer erro no contador aborta snapshot502. Memoria tem mesmo contrato. Harness137 testes/tipos/build/smoke OK.
