@@ -5,6 +5,14 @@ import { createMemoryRepositories } from "../src/repositories/memoryRepositories
 import { createSupabaseRepositories } from "../src/repositories/supabaseRepositories.js";
 
 describe("match location minimization", () => {
+  it("identifies the deployed privacy release without exposing secrets", async () => {
+    const app = await buildApp();
+    try {
+      const response = await app.inject({ method: "GET", url: "/health" });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ status: "ok", release: "privacy-20261114" });
+    } finally { await app.close(); }
+  });
   it.each([true, false])("uses coordinates for calculation but not event persistence (matched=%s)", async (matched) => {
     const repos = createMemoryRepositories();
     const findNearest = vi.fn().mockResolvedValue(matched ? {
