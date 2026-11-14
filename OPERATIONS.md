@@ -85,3 +85,8 @@ Aplicar src/db/migrations/0017_match_events_no_client_location.sql antes do depl
 ## SPEC-020 - Dominio admin (2026-11-14)
 
 CORS inclui https://admin.advogado20.com.br e mantem origin Vercel durante transicao, inclusive com override legado. Preflight authorization validado e origin malicioso rejeitado. Sem migrations. Harness local OK; publicacao e smoke remoto em andamento.
+
+
+## SPEC-021 - Gestao administrativa / 2026-11-14
+
+GET /v1/admin/cities aceita includeInactive=true apenas para admin; padrao preserva ativos e catalogo publico permanece filtrado. Reativacao via PATCH /v1/admin/cities/:id com active=true preserva identidade e coordenadas. POST antigo mantem compatibilidade; admin novo solicita escolha antes de PATCH. Harness112 testes/tipos/build/17 migrations estaticas/smoke OK. Sem migration ou exclusao de dados. Consulta real confirmou Sao Paulo/SP como cidade ativa preexistente.
