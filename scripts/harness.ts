@@ -12,7 +12,7 @@ const cwd = process.cwd();
 const stepsToRun = [
   { command: "npm run typecheck", objective: "Validar tipos TypeScript do backend." },
   { command: "npm run test", objective: "Executar testes unitarios/contrato do backend." },
-  { command: "npm run build", objective: "Gerar build Node para Railway." },
+  { command: "npm run build", objective: "Gerar build Node para DigitalOcean." },
   { command: "npm run migration:check", objective: "Validar todas as migrations Supabase/PostGIS (0001+) sem aplicacao remota por padrao." },
   { command: "npm run smoke", objective: "Validar healthcheck e rotas base localmente." }
 ];

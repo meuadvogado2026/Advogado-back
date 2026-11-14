@@ -81,3 +81,8 @@ deve limpar os pedidos neutros criados no teste.
 ## Env
 
 O backend pode ler `.env` da raiz do workspace e `.env` local do backend. A anon key e publica, mas a service role key e segredo critico e nunca deve ser exibida em logs, enviada ao mobile/admin ou commitada.
+
+
+## Minimizacao vigente - 2026-11-14
+
+Coordenadas somente no calculo RPC; novos eventos gravam NULL para localizacao, precisao e distancia. Migration 0017 impede novas escritas geograficas. Historico nao e apagado automaticamente. Oracoes permanecem opcionais, sensiveis, com acesso restrito e retencao de 90 dias; agendamento remoto exige comprovacao.
