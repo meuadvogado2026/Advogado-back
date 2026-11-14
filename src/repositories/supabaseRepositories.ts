@@ -1,3 +1,4 @@
+import { createSupabaseDashboardRepository } from "./adminDashboardSnapshot.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminBenefitCreate, AdminBenefitPatch, CityCreate, CityPatch, LawyerCreate, LawyerPatch, StateCreate, StatePatch } from "../contracts/api.js";
 import type {
@@ -1576,6 +1577,7 @@ export function createSupabaseRepositories(supabase: SupabaseClient): Repositori
     auditLogs: new SupabaseAuditLogRepository(supabase),
     matches: new SupabaseMatchRepository(supabase),
     matchEvents: new SupabaseMatchEventRepository(supabase),
+    adminDashboard: createSupabaseDashboardRepository(supabase),
     mode: "supabase"
   };
 }

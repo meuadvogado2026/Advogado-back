@@ -385,7 +385,18 @@ export interface MatchEventRepository {
   record(input: MatchEventInput): Promise<void>;
 }
 
+export type AdminDashboardSnapshot = {
+  profiles: Array<{ id: string; role: Role; blockedAt: string | null; createdAt: string | null }>;
+  lawyers: Array<{ id: string; profileId: string; status: LawyerRecord["status"]; serviceCityId: string | null; availableForMatches: boolean; hasOfficeLocation: boolean; confidence: string | null; precision: string | null }>;
+  cities: Array<{ id: string; stateId: string; name: string; active: boolean }>;
+  states: Array<{ id: string; code: string; name: string; active: boolean }>;
+};
+export interface AdminDashboardRepository {
+  snapshot(): Promise<AdminDashboardSnapshot>;
+}
+
 export type Repositories = {
+  adminDashboard: AdminDashboardRepository;
   profiles: ProfileRepository;
   legalSpecialties: LegalSpecialtyRepository;
   geographies: GeographyRepository;

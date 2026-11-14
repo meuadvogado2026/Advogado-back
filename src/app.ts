@@ -1,3 +1,4 @@
+import { registerAdminDashboardRoutes } from "./modules/adminDashboard/routes.js";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
@@ -67,6 +68,7 @@ export async function buildApp(repositoriesOverride?: Repositories) {
     await registerSpec008Routes(v1, env, repositories);
     await registerAdminLawyerRoutes(v1, env, repositories);
     await registerAdminOperationRoutes(v1, env, repositories);
+    await registerAdminDashboardRoutes(v1, env, repositories);
   }, { prefix: env.API_BASE_PATH });
 
   return app;

@@ -265,3 +265,8 @@ CORS inclui https://admin.advogado20.com.br e mantem origin Vercel durante trans
 ## SPEC-021 - Gestao administrativa / 2026-11-14
 
 GET /v1/admin/cities aceita includeInactive=true apenas para admin; padrao preserva ativos e catalogo publico permanece filtrado. Reativacao via PATCH /v1/admin/cities/:id com active=true preserva identidade e coordenadas. POST antigo mantem compatibilidade; admin novo solicita escolha antes de PATCH. Harness112 testes/tipos/build/17 migrations estaticas/smoke OK. Sem migration ou exclusao de dados. Consulta real confirmou Sao Paulo/SP como cidade ativa preexistente.
+
+
+## SPEC-022 - Dashboard e consulta por estado / 2026-11-14
+
+GET /v1/admin/dashboard exige role admin e retorna somente agregados com Cache-Control private/no-store. Snapshot minimal de profiles/lawyer_profiles/cities/states percorre todas as paginas porID, count exact e tamanho efetivo devolvido. Service separa usuarios do app (client+lawyer, sem admin), clientes, contaslawyer, novos30dias, cadastros porstatus, elegiveis e cidades/regioes/UF. Regiao usa cidade de atendimento, nao OAB/localizacao de cliente; Nao informado incluido no denominador. Erro parcial retorna502, nao zero. Sem migration. Harness131 testes/tipos/build/smoke OK; publicar antesadmin.
