@@ -255,3 +255,8 @@ autenticado/remoto permanece pendente.
 Redirect Supabase de primeiro acesso esta corrigido e validado por sonda redigida:
 links com `redirectTo` apontam para `advogado20admin.vercel.app/primeiro-acesso`. Falta
 apenas o smoke humano de definir senha a partir de convite recebido em e-mail real valido.
+
+
+## SPEC-020 - Dominio admin (2026-11-14)
+
+CORS inclui https://admin.advogado20.com.br e mantem origin Vercel durante transicao, inclusive com override legado. Preflight authorization validado e origin malicioso rejeitado. Sem migrations. Harness local OK; publicacao e smoke remoto em andamento.

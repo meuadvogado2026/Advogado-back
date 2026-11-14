@@ -80,3 +80,8 @@ O script nao imprime senhas nem JWTs.
 ## Release de privacidade 2026-11-14
 
 Aplicar src/db/migrations/0017_match_events_no_client_location.sql antes do deploy. App Platform: Node 22, npm run build, npm start, porta 8080, HOST=0.0.0.0, NPM_CONFIG_PRODUCTION=false no build e chave sb_secret somente no runtime. URL ativa https://advogado20-app-wlrbq.ondigitalocean.app. Forward-fix mantendo a protecao de privacidade.
+
+
+## SPEC-020 - Dominio admin (2026-11-14)
+
+CORS inclui https://admin.advogado20.com.br e mantem origin Vercel durante transicao, inclusive com override legado. Preflight authorization validado e origin malicioso rejeitado. Sem migrations. Harness local OK; publicacao e smoke remoto em andamento.
