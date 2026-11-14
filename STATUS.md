@@ -1,3 +1,7 @@
+# Atualizacao 2026-11-14 - Privacidade no App Platform
+
+API minimiza novos match_events: sem coordenada, precisao ou distancia. Aplicar migration 0017 antes deste deploy. CHECK NOT VALID preserva linhas historicas; saneamento legado e agendamento sao gates separados. Validar login, match, perfil e prayer-requests apos deploy.
+
 # Backend Status - Advogado 2.0
 
 - 2026-07-25 Google OAuth cadastro explicito OK: `POST /v1/auth/oauth-client/complete`

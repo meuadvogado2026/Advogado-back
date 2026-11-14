@@ -8,6 +8,10 @@ const seedsDir = "src/db/seeds";
 // Padroes obrigatorios por migration. Migrations sem entrada aqui caem no
 // fallback generico (apenas exige conteudo SQL nao vazio).
 const requiredByMigration: Record<string, RegExp[]> = {
+  "0017_match_events_no_client_location.sql": [
+    /alter column client_location drop not null/i,
+    /check\s*\(client_location is null and accuracy_m is null and distance_km is null\) not valid/i
+  ],
   "0001_foundation_postgis.sql": [
     /create extension if not exists postgis/i,
     /do\s+\$\$[\s\S]+create type public\.profile_role/i,

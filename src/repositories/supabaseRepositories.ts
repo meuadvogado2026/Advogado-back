@@ -1062,10 +1062,10 @@ class SupabaseMatchEventRepository implements MatchEventRepository {
     const { error } = await this.supabase.from("match_events").insert({
       client_profile_id: input.clientProfileId,
       lawyer_profile_id: input.lawyerProfileId,
-      client_location: `SRID=4326;POINT(${input.lng} ${input.lat})`,
-      accuracy_m: input.accuracyM,
+      client_location: null,
+      accuracy_m: null,
       specialty_ids: input.specialtyIds,
-      distance_km: input.distanceKm,
+      distance_km: null,
       algorithm_version: input.algorithmVersion
     });
     assertSupabaseOk(error, "match_events.record");

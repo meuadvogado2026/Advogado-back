@@ -377,11 +377,7 @@ export interface MatchRepository {
 export type MatchEventInput = {
   clientProfileId?: string;
   lawyerProfileId?: string;
-  lat: number;
-  lng: number;
-  accuracyM?: number;
   specialtyIds: string[];
-  distanceKm?: number;
   algorithmVersion: string;
 };
 

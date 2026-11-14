@@ -21,7 +21,7 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
       return reply.code(422).send(apiError("VALIDATION_ERROR", "Payload de match invalido.", parsed.error.issues));
     }
 
-    const { lat, lng, accuracyM, areaIds } = parsed.data;
+    const { lat, lng, areaIds } = parsed.data;
     if (repositories.mode === "supabase" && areaIds.some((areaId) => !isSupabaseAreaId(areaId))) {
       return reply.code(422).send(apiError("VALIDATION_ERROR", "Payload de match invalido."));
     }
@@ -33,23 +33,18 @@ export async function registerMatchRoutes(app: FastifyInstance, env: AppEnv, rep
       maxRadiusKm: env.MATCH_MAX_RADIUS_KM
     });
 
-    // Evento de match: coordenada vai para o banco (auditoria/produto), nunca para logs.
+    // Coordenadas sao usadas somente no calculo; evento nao retém geografia do cliente.
     // Se a persistencia do evento falhar, o usuario ainda deve receber o resultado do match.
     try {
       await repositories.matchEvents.record({
         clientProfileId: request.currentUser?.id,
         lawyerProfileId: nearest?.lawyer.id,
-        lat,
-        lng,
-        accuracyM,
         specialtyIds: areaIds,
-        distanceKm: nearest?.distanceReliable === false ? undefined : nearest?.distanceKm,
         algorithmVersion: ALGORITHM_VERSION
       });
-    } catch (error) {
+    } catch {
       request.log.warn(
         {
-          err: error,
           hasMatchedLawyer: Boolean(nearest),
           algorithmVersion: ALGORITHM_VERSION
         },
