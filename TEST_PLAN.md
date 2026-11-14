@@ -96,3 +96,8 @@ Resultado em 2026-06-03: testes focados exit code 0; dry-run exit code 0 com `ma
 - 2026-06-05 hotfix GEO/admin CEP: `npm run test -- --run tests/geocoding.test.ts tests/app.test.ts` exit 0 (59 testes), `npm run typecheck` exit 0, sonda real segura do CEP informado retornou `hasCoordinate=true`, `precision=cep_centroid`, `confidence=medium`, `npm run harness` exit 0 (70 testes, build, migration dry-run e smoke local) e `PROD_BASE_URL=https://advogado-back-production.up.railway.app npm run prod:smoke` exit 0 apos deploy Railway do commit `b0b4ea6`.
 
 Registrar comando, cwd, exit code, resultado e lacunas.
+
+
+## SPEC-020 - Dominio admin (2026-11-14)
+
+CORS inclui https://admin.advogado20.com.br e mantem origin Vercel durante transicao, inclusive com override legado. Preflight authorization validado e origin malicioso rejeitado. Sem migrations. Harness local OK; publicacao e smoke remoto em andamento.
