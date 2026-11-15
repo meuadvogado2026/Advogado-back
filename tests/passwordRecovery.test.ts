@@ -6,6 +6,19 @@ import { createAuthMailer } from "../src/modules/auth/authMailer.js";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("secure password recovery", () => {
+  it("gives successive recovery attempts distinct subjects and visible request references", async () => {
+    const fetcher = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ id: "mail-test-only" }), { status: 200 }));
+    const mailer = createAuthMailer(loadEnv({ NODE_ENV: "test", EMAIL_PROVEDOR: "resend", RESEND_API_KEY: "re_test_key" }), fetcher);
+    await mailer.send("controlled@example.test", "a".repeat(56));
+    await mailer.send("controlled@example.test", "b".repeat(56));
+    const first = JSON.parse(fetcher.mock.calls[0]![1]!.body);
+    const second = JSON.parse(fetcher.mock.calls[1]![1]!.body);
+    expect(first.subject).not.toEqual(second.subject);
+    expect(first.text).toContain("Solicitação:");
+    expect(first.html).toContain("Solicitação:");
+    expect(first.text).toContain("Use somente a solicitação mais recente.");
+    expect(first.subject).not.toContain("a".repeat(56));
+  });
   it("trusts DO client IP only by explicit production config and never trusts X-Forwarded-For", () => {
     const request = { ip: "127.0.0.1", headers: { "do-connecting-ip": "198.51.100.20", "x-forwarded-for": "203.0.113.5" } };
     expect(authRequestIp(request, loadEnv({ NODE_ENV: "production" }))).toBe("127.0.0.1");

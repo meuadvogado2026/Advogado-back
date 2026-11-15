@@ -105,3 +105,11 @@ CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e
 Consultar AUTH_LINKS.md para envs, rollout/rollback, limites de fila/replicas e gates de recebimento/Android. Nenhum MX/SMTP alterado.
 
 SPEC-024: candidato no PR https://github.com/meuadvogado2026/Advogado-back/pull/9; CI remoto de Harness/audit passou. Publicar API antes de web/mobile somente apos confirmar AUTH_IP_SOURCE=digitalocean emRun time. Browser nao conseguiu salvar por verificacaoURL; doctl401. Nao presumir recebimento nem atualizar landing/APK ainda.
+
+## Validacao de producao e ajuste de mensagens - 2026-11-15
+
+API PR9/5129316 publicada; admin PR6/05a9d6f publicado com headers de autenticacao. Prova direta contra API hospedada confirmou reset/login novo/senha antiga rejeitada/replay/refresh/identidade e cleanup. Recebimento real observado em Gmail para aliases de teste. Gmail agrupou templates identicos e ocultou o corpo mais recente, deixando um botao de fixture anterior ja encerrada; fluxo humano retornou401. Retry completo ainda precisa de prova.
+
+Correcao do template: assunto com referencia aleatoria nao secreta, horario de Brasilia e aviso de usar a solicitacao mais recente antes do botao. A referencia e apenas identificador de tentativa/idempotencia, nunca credencial ou token de Auth. Retry do mesmo envio mantem mesmo assunto/payload/chave; reenvio autorizado cria nova referencia. TEST-242 em passwordRecovery.test.ts cobre distincao; Harness deve passar antes de publicar. scripts/auth024-production-proof-smoke.ts e opt-in, usa somente conta descartavel autorizada, API real e cleanup; nao envia email nem homologa recebimento sozinho.
+
+Tentativa de cadastro advogado com CEP70040900 foi recusada422 porque CEPnaoexiste no provider; diagnostico de IDs passou e CEP01001000 respondeu200. Corrigir somente fixture de QA, sem alterar validacao/geocoding. Android/APK continuam bloqueados ate sucesso real de email/convite.
