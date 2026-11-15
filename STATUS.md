@@ -315,3 +315,7 @@ Usuario pediu seguir e aprovou o fluxo da conta existente; primeiro acesso human
 ## Correcao de codificacao antes da entrega - 2026-11-15
 
 Inspecao estrita UTF-8 detectou bytes CP1252 isolados em mensagens Auth de mobile/PasswordAccessScreen, admin/App e back/adminLawyers/routes. Corrigidos apenas esses bytes, preservando contratos/comportamento. Prova inicial: decode UTF-8 falhou; apos correcao todos os fontes/tests/scripts ts/tsx/json/css dos worktrees decodificam sem erro. Harness completo repetido nos tres. Build vc8 cancelado antes de disponibilizacao para evitar texto corrompido. Proximo candidato vc9 (vc8 ja observado no inventario), mesma assinatura/package. Teste Android sera manual pelo usuario, conforme escolha expressa.
+
+## Banner aprovado — implementação local 2026-11-15
+
+Branch feat/email-banner-approved (base cde452d): AuthMailer inclui assets/email/advogado20-email-compacto-1200x240.png via CID, com HTML responsivo, alt e conteúdo essencial em texto. Aplica-se a recuperação/primeiro acesso e convites/reenvios. Harness Node22 PASS:162testes, tipos, build, migrationdryrun e smoke. Smoke do dist em600/360 e semimagem PASS; evidências na raiz geral harness-results/email-banner/. Não publicado nem enviado a destinatário real. Não encerra gates Android/Google/convite humano existentes.

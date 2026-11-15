@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { authEmailBanner, renderAuthEmail } from "./authEmailTemplate.js";
 import type { AppEnv } from "../../config/env.js";
 
 export function createAuthMailer(env: AppEnv, fetchImpl: typeof fetch = fetch) {
@@ -14,7 +15,7 @@ export function createAuthMailer(env: AppEnv, fetchImpl: typeof fetch = fetch) {
       const requestedAt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "medium" }).format(new Date());
       const requestNotice = `Solicitação: ${requestedAt} (horário de Brasília). Referência: ${reference}. Use somente a solicitação mais recente.`;
       const text = `Advogado 2.0\n\nDefina uma nova senha para sua conta ou conclua seu primeiro acesso.\n\n${requestNotice}\n\n${link}\n\nEste link é pessoal, de uso único e expira conforme a política de segurança da conta. Se expirou, solicite outro no aplicativo. Sua senha só muda após confirmar o formulário. Se não solicitou, ignore esta mensagem.\nSuporte: suporte@advogado20.com.br`;
-      const body = JSON.stringify({ from: env.AUTH_EMAIL_FROM, reply_to: "suporte@advogado20.com.br", to: [email], subject: `Advogado 2.0 — Defina sua senha (${reference})`, text, html: `<main lang="pt-BR"><h1>Advogado 2.0</h1><h2>Defina sua senha</h2><p>Recupere sua conta ou conclua seu primeiro acesso com segurança.</p><p>${requestNotice}</p><p><a href="${link.replace(/&/g, "&amp;")}">Definir nova senha</a></p><p>Link pessoal, de uso único. A validade segue a política de segurança da conta. Se expirou, peça outro no aplicativo. A senha só muda após confirmar o formulário.</p><p>Se não solicitou, ignore este e-mail.</p><p>Suporte: suporte@advogado20.com.br</p></main>` });
+      const body = JSON.stringify({ from: env.AUTH_EMAIL_FROM, reply_to: "suporte@advogado20.com.br", to: [email], subject: `Advogado 2.0 — Defina sua senha (${reference})`, text, html: renderAuthEmail(link, requestNotice), attachments: [authEmailBanner()] });
       for (let retry = 0; retry < 2; retry++) {
         try {
           const response = await fetchImpl("https://api.resend.com/emails", {
