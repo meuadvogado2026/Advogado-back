@@ -21,6 +21,11 @@ const envSchema = z.object({
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:5173,http://localhost:8081,https://advogado20admin.vercel.app"),
+  EMAIL_PROVEDOR: z.enum(["resend", "disabled"]).default("disabled"),
+  AUTH_IP_SOURCE: z.enum(["socket", "digitalocean"]).default("socket"),
+  RESEND_API_KEY: z.string().optional(),
+  AUTH_EMAIL_FROM: z.string().refine(value => /^Advogado 2\.0 <suporte@advogado20\.com\.br>$/.test(value), "Remetente nao autorizado").default("Advogado 2.0 <suporte@advogado20.com.br>"),
+  AUTH_PASSWORD_REDIRECT_URL: z.literal("https://admin.advogado20.com.br/redefinir-senha").default("https://admin.advogado20.com.br/redefinir-senha"),
   LAWYER_INVITE_REDIRECT_URL: z.string().url().default("https://advogado20admin.vercel.app/primeiro-acesso"),
   SUPABASE_URL: z.string().url().default("https://qpemxkiowiiklztgumqy.supabase.co"),
   SUPABASE_ANON_KEY: z.string().optional(),

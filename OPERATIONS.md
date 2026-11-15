@@ -100,3 +100,6 @@ GET /v1/admin/dashboard exige role admin e retorna somente agregados com Cache-C
 ## SPEC-023 - Operacao no dashboard / 2026-11-14
 
 CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e benefits(total,active,inactive,activePercentage). Snapshot repo conta apenas HEAD/count exact porstatus e active; nao carrega texto/autor/midia/descricao. Sem limite de primeira pagina e sem migration. Status de oracao continuam received/read, como confirmado pelo usuario; lida nao e respondida. Qualquer erro no contador aborta snapshot502. Memoria tem mesmo contrato. Harness137 testes/tipos/build/smoke OK.
+
+## SPEC-024
+Consultar AUTH_LINKS.md para envs, rollout/rollback, limites de fila/replicas e gates de recebimento/Android. Nenhum MX/SMTP alterado.

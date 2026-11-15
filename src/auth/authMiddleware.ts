@@ -60,6 +60,10 @@ export function createAuthPreHandler(env: AppEnv, repositories: Repositories, al
       };
     }
 
+    const path = request.routeOptions.url?.slice(env.API_BASE_PATH.length);
+    if (request.currentUser.mustChangePassword && path !== "/me" && path !== "/auth/change-password") {
+      return reply.code(403).send(apiError("FORBIDDEN", "Defina sua senha antes de continuar."));
+    }
     if (allowedRoles && !allowedRoles.includes(request.currentUser.role)) {
       return reply.code(403).send(apiError("FORBIDDEN", "Role insuficiente para esta rota."));
     }

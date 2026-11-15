@@ -49,3 +49,6 @@
 - Rotas publicas: `GET /health`, `GET /v1/areas`, `POST /v1/match`.
 - Rotas admin: exigem `Authorization: Bearer <Supabase JWT>` e perfil com `role = admin`.
 - Em `NODE_ENV=test`, tokens fixos `test-admin-token` e `test-client-token` permitem testar 401/403 sem segredos.
+
+## Delta local SPEC-024 (nao publicado)
+Fonte: analise direta do codigo, 2026-11-15. Contratos/ownership e fluxo em AUTH_LINKS.md. Camadas existentes preservadas; provas remotas sao gates separados.

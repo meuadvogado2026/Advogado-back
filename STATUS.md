@@ -275,3 +275,9 @@ GET /v1/admin/dashboard exige role admin e retorna somente agregados com Cache-C
 ## SPEC-023 - Operacao no dashboard / 2026-11-14
 
 CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e benefits(total,active,inactive,activePercentage). Snapshot repo conta apenas HEAD/count exact porstatus e active; nao carrega texto/autor/midia/descricao. Sem limite de primeira pagina e sem migration. Status de oracao continuam received/read, como confirmado pelo usuario; lida nao e respondida. Qualquer erro no contador aborta snapshot502. Memoria tem mesmo contrato. Harness137 testes/tipos/build/smoke OK.
+
+## SPEC-024 - Acesso seguro / 2026-11-15
+
+Estado: EM_VALIDACAO; nao homologado. Fonte em worktree `.codex-auth-024`, branch `feat/secure-auth-resend`, preservando checkout original.
+Recuperacao e convite por link oficial Supabase, enviado via API Resend no backend. Nenhuma senha em e-mail. Formulario consome token_hash recovery apenas no POST; nenhum JWT de recuperacao entregue ao app/browser. API aditiva `/v1/auth/password-recovery` e `/v1/auth/password-reset`; reenvio admin preserva identidade. Sem nova migration. API antes web/mobile, com smoke e rollback de app/web antes de remover contratos.
+Harness e limites em AUTH_LINKS.md; evidencias gerais `../../harness-results/spec024-acesso-seguro-resend.md` a partir do worktree. Aceitacao pelo provedor nao comprova recebimento. Android/APK, Google real, configuracao e entrega Resend ainda precisam de prova. Nao e 10/10 nem aprovacao Play.
