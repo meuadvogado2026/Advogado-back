@@ -295,3 +295,18 @@ API PR9/5129316 publicada; admin PR6/05a9d6f publicado com headers de autenticac
 Correcao do template: assunto com referencia aleatoria nao secreta, horario de Brasilia e aviso de usar a solicitacao mais recente antes do botao. A referencia e apenas identificador de tentativa/idempotencia, nunca credencial ou token de Auth. Retry do mesmo envio mantem mesmo assunto/payload/chave; reenvio autorizado cria nova referencia. TEST-242 em passwordRecovery.test.ts cobre distincao; Harness deve passar antes de publicar. scripts/auth024-production-proof-smoke.ts e opt-in, usa somente conta descartavel autorizada, API real e cleanup; nao envia email nem homologa recebimento sozinho.
 
 Tentativa de cadastro advogado com CEP70040900 foi recusada422 porque CEPnaoexiste no provider; diagnostico de IDs passou e CEP01001000 respondeu200. Corrigir somente fixture de QA, sem alterar validacao/geocoding. Android/APK continuam bloqueados ate sucesso real de email/convite.
+
+
+## Continuidade Auth024 - 2026-11-15 / validacao humana
+
+API publicada em PR9/5129316 e PR10/510be2e; health authRelease secure-links-20261115-r2. Prova controlada hospedada confirmou reset/login novo/senha antiga/replay/refresh e cleanup. Usuario confirmou troca e login no painel do advogado; identidade desse relato ainda nao reconciliada com fixture cliente do Harness. Convite inicial real HTTP201/Resend accepted em15/11/2026 13h29 Brasilia, para advogado descartavel draft e fora do match. Recebimento/primeiro acesso/reenvio aguardam prova humana. Nao confundir accepted com entregue. Android/Google seguem pendentes.
+
+
+### Esclarecimento confirmado pelo usuario - 2026-11-15
+
+A troca de senha e o login normal no painel do advogado foram na conta de advogado ja existente do usuario. Essa prova humana nao pertence ao alias descartavel client do Harness. Recebimento/troca/login de advogado existente confirmados pelo usuario; ID/role dessa conta nao foram aferidos pelo Harness. A fixture cliente possui provas independentes de dominio/senha antiga recusada. Primeiro acesso do novo advogado descartavel enviado as13h29 ainda aguarda confirmacao; nao reenviar/invalidar esse link antes do teste humano. Android/Google/APK seguem pendentes.
+
+
+### Encerramento de fixtures e preview autorizado - 2026-11-15
+
+Usuario pediu seguir e aprovou o fluxo da conta existente; primeiro acesso humano da fixture permanece nao testado. Reenvio real HTTP200/Resend accepted com identidade preservada; nao e prova de recebimento. Fixtures client/lawyer removidas com ownership e ausencia Auth/dominio verificados, evidencia raiz spec024-live-final-cleanup.json. Proximo passo APK preview0.1.1/vc8 para validar Android; nenhum AAB/Play/landing publicado.
