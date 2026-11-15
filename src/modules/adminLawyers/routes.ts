@@ -348,7 +348,7 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     }
     // A resend never creates/replaces Auth/profile/lawyer or resets access state.
     const delivery = await deliverAccess(profile.id, profile.email);
-    if (delivery === "failed") return reply.code(503).send(apiError("UPSTREAM_ERROR", "Convite n„o enviado. Cadastro preservado; tente reenviar em um minuto."));
+    if (delivery === "failed") return reply.code(503).send(apiError("UPSTREAM_ERROR", "Convite n√£o enviado. Cadastro preservado; tente reenviar em um minuto."));
     const access: ProvisionedLawyerAccess = { profileId: profile.id, accessInvitedAt: new Date().toISOString(), delivery };
     const lawyer = existing;
 
