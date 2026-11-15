@@ -5,6 +5,7 @@ export async function registerHealthRoutes(app: FastifyInstance) {
     status: "ok",
     service: "advogado-20-back",
     release: "privacy-20261114",
+    authRelease: "secure-links-20261115-r2",
     timestamp: new Date().toISOString()
   }));
 }
