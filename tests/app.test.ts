@@ -647,7 +647,7 @@ describe("foundation API", () => {
     expect(response.json().access.token).toBeUndefined();
   });
 
-  it("activates access for a legacy lawyer without returning invite secrets", async () => {
+  it("resends access without changing lawyer identity or returning invite secrets", async () => {
     const repos = createMemoryRepositories();
     const legacy = await repos.lawyers.create({
       name: "Dra. Legado Acesso",
@@ -673,7 +673,7 @@ describe("foundation API", () => {
     await app.close();
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().lawyer.profileId).not.toBe(legacy.profileId);
+    expect(response.json().lawyer.profileId).toBe(legacy.profileId);
     expect(response.json().access).toMatchObject({ status: "invited", delivery: "simulated" });
     expect(JSON.stringify(response.json())).not.toContain("password");
     expect(JSON.stringify(response.json())).not.toContain("token");

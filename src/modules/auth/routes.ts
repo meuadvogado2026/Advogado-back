@@ -1,3 +1,4 @@
+import { registerPasswordRoutes } from "./passwordRoutes.js";
 import type { FastifyInstance } from "fastify";
 import { createAuthPreHandler, extractBearerToken } from "../../auth/authMiddleware.js";
 import type { AppEnv } from "../../config/env.js";
@@ -61,6 +62,7 @@ async function resolveOAuthIdentity(token: string, env: AppEnv): Promise<OAuthId
 }
 
 export async function registerAuthRoutes(app: FastifyInstance, env: AppEnv, repositories: Repositories) {
+  await registerPasswordRoutes(app, env, repositories);
   const requireAuthenticated = createAuthPreHandler(env, repositories);
 
   app.post("/auth/signup-client", async (request, reply) => {

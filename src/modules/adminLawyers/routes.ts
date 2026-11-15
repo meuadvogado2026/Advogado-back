@@ -1,3 +1,5 @@
+import { createAuthMailer } from "../auth/authMailer.js";
+import { createAuthLimiter } from "../auth/passwordRoutes.js";
 import type { FastifyInstance } from "fastify";
 import type { AppEnv } from "../../config/env.js";
 import { geocodeCepSchema, lawyerCreateSchema, lawyerPatchSchema } from "../../contracts/api.js";
@@ -45,55 +47,56 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
   const requireAdmin = createAuthPreHandler(env, repositories, ["admin"]);
   const geocoding = createGeocodingProvider(env);
 
+  const mailer = createAuthMailer(env);
+  const allowInvite = createAuthLimiter();
   type ProvisionedLawyerAccess = {
     profileId: string;
     accessInvitedAt: string;
-    delivery: "email" | "simulated";
+    delivery: "email" | "simulated" | "failed";
     rollback?: () => Promise<void>;
   };
 
   async function provisionLawyerAccess(input: { email: string; name: string }): Promise<ProvisionedLawyerAccess | null> {
     const invitedAt = new Date().toISOString();
-    if (repositories.mode === "memory") {
-      return {
-        profileId: crypto.randomUUID(),
-        accessInvitedAt: invitedAt,
-        delivery: "simulated"
-      };
-    }
-
+    if (repositories.mode === "memory") return { profileId: crypto.randomUUID(), accessInvitedAt: invitedAt, delivery: "simulated" };
+    if (env.EMAIL_PROVEDOR !== "resend" || !env.RESEND_API_KEY) return null;
     const supabase = createSupabaseAdminClient(env);
     if (!supabase) return null;
-
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(input.email, {
-      data: {
-        name: input.name,
-        role: "lawyer"
-      },
-      redirectTo: env.LAWYER_INVITE_REDIRECT_URL
+    // Explicit creation fails for an existing Auth identity. Never adopt/change
+    // an existing client/admin role, and never compensate an existing identity.
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: input.email, email_confirm: true, user_metadata: { name: input.name }
     });
+    if (error || !data.user) throw new Error("LAWYER_ACCESS_CREATE_FAILED");
+    const profileId = data.user.id;
+    return { profileId, accessInvitedAt: invitedAt, delivery: "failed", rollback: async () => {
+      const result = await supabase.auth.admin.deleteUser(profileId);
+      if (result.error) app.log.error({ event: "auth.lawyer_create.compensation_failed", profileId });
+    } };
+  }
 
-    if (error || !data.user) {
-      throw new Error("LAWYER_ACCESS_INVITE_FAILED");
+  async function deliverAccess(profileId: string, email: string): Promise<"email" | "simulated" | "failed"> {
+    if (repositories.mode === "memory") return "simulated";
+    try {
+      const supabase = createSupabaseAdminClient(env);
+      if (!supabase) return "failed";
+      const identity = await supabase.auth.admin.getUserById(profileId);
+      if (identity.error || identity.data.user?.email?.toLowerCase() !== email.toLowerCase()) return "failed";
+      const { data, error } = await supabase.auth.admin.generateLink({ type: "recovery", email });
+      if (error || data.user?.id !== profileId || !data.properties?.hashed_token) return "failed";
+      const result = await mailer.send(email, data.properties.hashed_token);
+      app.log.info({ event: "auth.email.accepted", messageId: result.messageId });
+      return "email";
+    } catch {
+      app.log.error({ event: "auth.lawyer_invite.failed" });
+      return "failed";
     }
-
-    return {
-      profileId: data.user.id,
-      accessInvitedAt: data.user.invited_at ?? invitedAt,
-      delivery: "email",
-      rollback: async () => {
-        await supabase.auth.admin.deleteUser(data.user!.id);
-      }
-    };
   }
 
   function accessResponse(access: ProvisionedLawyerAccess | null) {
     if (!access) return { status: "not_configured", delivery: "none" as const };
-    return {
-      status: "invited" as const,
-      delivery: access.delivery,
-      invitedAt: access.accessInvitedAt
-    };
+    return { status: access.delivery === "failed" ? "failed" : "invited", delivery: access.delivery,
+      providerStatus: access.delivery === "email" ? "accepted" : access.delivery, invitedAt: access.accessInvitedAt };
   }
 
   /**
@@ -300,12 +303,14 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
       lawyer = await repositories.lawyers.create(lawyerInput, officeLocation, {
         profileId: access.profileId,
         accessInvitedAt: access.accessInvitedAt,
-        mustChangePassword: false
+        mustChangePassword: true
       });
     } catch (error) {
       await access.rollback?.();
       throw error;
     }
+
+    access.delivery = await deliverAccess(access.profileId, lawyer.email);
 
     await repositories.auditLogs.record({
       actorProfileId: request.currentUser?.id,
@@ -335,34 +340,17 @@ export async function registerAdminLawyerRoutes(app: FastifyInstance, env: AppEn
     if (!profile) {
       return reply.code(404).send(apiError("NOT_FOUND", "Perfil do advogado nao encontrado."));
     }
-    if (profile.accessInvitedAt) {
-      return reply.code(409).send(apiError("CONFLICT", "Advogado ja possui convite de acesso registrado."));
+    if (profile.role !== "lawyer" || profile.blockedAt) {
+      return reply.code(403).send(apiError("FORBIDDEN", "Perfil sem acesso autorizado."));
     }
-
-    let access: ProvisionedLawyerAccess | null;
-    try {
-      access = await provisionLawyerAccess({ email: existing.email, name: existing.name });
-    } catch {
-      return reply.code(422).send(apiError("VALIDATION_ERROR", "Nao foi possivel enviar convite de acesso para este e-mail."));
+    if (!allowInvite(`lawyer:${profile.id}`, 3, 60_000)) {
+      return reply.code(429).send(apiError("CONFLICT", "Aguarde um minuto antes de reenviar o convite."));
     }
-    if (!access) {
-      return reply.code(503).send(apiError("UPSTREAM_ERROR", "Convite de acesso indisponivel sem credencial server-side."));
-    }
-
-    let lawyer;
-    try {
-      lawyer = await repositories.lawyers.activateAccess(id, {
-        profileId: access.profileId,
-        accessInvitedAt: access.accessInvitedAt
-      });
-    } catch (error) {
-      await access.rollback?.();
-      throw error;
-    }
-    if (!lawyer) {
-      await access.rollback?.();
-      return reply.code(404).send(apiError("NOT_FOUND", "Advogado nao encontrado."));
-    }
+    // A resend never creates/replaces Auth/profile/lawyer or resets access state.
+    const delivery = await deliverAccess(profile.id, profile.email);
+    if (delivery === "failed") return reply.code(503).send(apiError("UPSTREAM_ERROR", "Convite não enviado. Cadastro preservado; tente reenviar em um minuto."));
+    const access: ProvisionedLawyerAccess = { profileId: profile.id, accessInvitedAt: new Date().toISOString(), delivery };
+    const lawyer = existing;
 
     await repositories.auditLogs.record({
       actorProfileId: request.currentUser?.id,

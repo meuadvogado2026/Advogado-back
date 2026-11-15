@@ -116,3 +116,8 @@ GET /v1/admin/dashboard exige role admin e retorna somente agregados com Cache-C
 ## SPEC-023 - Operacao no dashboard / 2026-11-14
 
 CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e benefits(total,active,inactive,activePercentage). Snapshot repo conta apenas HEAD/count exact porstatus e active; nao carrega texto/autor/midia/descricao. Sem limite de primeira pagina e sem migration. Status de oracao continuam received/read, como confirmado pelo usuario; lida nao e respondida. Qualquer erro no contador aborta snapshot502. Memoria tem mesmo contrato. Harness137 testes/tipos/build/smoke OK.
+
+## SPEC-024
+Harness + testes de prova/replay/roles/compensacao, deeplink/refresh/logout e smoke webmock. Prova Supabase real com cleanup no back/scripts/auth024-provider-smoke.ts, executada somente para conta descartavel autorizada. Roteiroreal de email, Google, Android cold/warm e APK e bloqueante; consultar AUTH_LINKS.md.
+
+SPEC-024 TASK-245: CI quality.yml executa npmci/Harness/audit-high em Node22/Linux, com preservacao de evidencias. Excecao TDD para configuracao: prova substituta e execucao real do workflow GitHub; nao substitui Resend/Android.

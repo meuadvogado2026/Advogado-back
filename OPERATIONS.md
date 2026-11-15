@@ -100,3 +100,8 @@ GET /v1/admin/dashboard exige role admin e retorna somente agregados com Cache-C
 ## SPEC-023 - Operacao no dashboard / 2026-11-14
 
 CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e benefits(total,active,inactive,activePercentage). Snapshot repo conta apenas HEAD/count exact porstatus e active; nao carrega texto/autor/midia/descricao. Sem limite de primeira pagina e sem migration. Status de oracao continuam received/read, como confirmado pelo usuario; lida nao e respondida. Qualquer erro no contador aborta snapshot502. Memoria tem mesmo contrato. Harness137 testes/tipos/build/smoke OK.
+
+## SPEC-024
+Consultar AUTH_LINKS.md para envs, rollout/rollback, limites de fila/replicas e gates de recebimento/Android. Nenhum MX/SMTP alterado.
+
+SPEC-024: candidato no PR https://github.com/meuadvogado2026/Advogado-back/pull/9; CI remoto de Harness/audit passou. Publicar API antes de web/mobile somente apos confirmar AUTH_IP_SOURCE=digitalocean emRun time. Browser nao conseguiu salvar por verificacaoURL; doctl401. Nao presumir recebimento nem atualizar landing/APK ainda.

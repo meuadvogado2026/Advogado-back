@@ -86,3 +86,6 @@ O backend pode ler `.env` da raiz do workspace e `.env` local do backend. A anon
 ## Minimizacao vigente - 2026-11-14
 
 Coordenadas somente no calculo RPC; novos eventos gravam NULL para localizacao, precisao e distancia. Migration 0017 impede novas escritas geograficas. Historico nao e apagado automaticamente. Oracoes permanecem opcionais, sensiveis, com acesso restrito e retencao de 90 dias; agendamento remoto exige comprovacao.
+
+## SPEC-024
+Prova recovery isolada e consumo oficial porPOST, sem JWTnaUI. EnvioResend server-side; rate limits HMAC e idempotencia limitada. Refresh e revogacao/limites em AUTH_LINKS.md. Recebimento/Android pendentes; sem garantia de revogacao de JWT imediatamente emvalidacao offline.

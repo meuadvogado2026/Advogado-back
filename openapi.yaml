@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Advogado 2.0 API
-  version: 0.7.0-mobile-signup-ux
+  version: 0.8.0-secure-password-links
 servers:
   - url: http://localhost:3333
 paths:
@@ -371,7 +371,7 @@ paths:
           description: Provider de geocoding indisponivel
   /v1/admin/lawyers/{id}/access-invite:
     post:
-      summary: Ativa convite de primeiro acesso para advogado legado
+      summary: Reenvia link seguro preservando a identidade do advogado
       security:
         - bearerAuth: []
       parameters:
@@ -382,17 +382,17 @@ paths:
             type: string
       responses:
         "200":
-          description: Convite enviado e perfil legado revinculado ao auth.users.id
+          description: Provedor aceitou envio; identidade preservada, recebimento nao comprovado
         "401":
           description: Token ausente ou invalido
         "403":
           description: Role insuficiente
         "404":
           description: Advogado ou perfil nao encontrado
-        "409":
-          description: Convite ja registrado
-        "422":
-          description: Auth recusou o convite
+        "429":
+          description: Cooldown de um minuto ou limite por advogado
+        "503":
+          description: Envio indisponivel ou identidade Auth inconsistente; cadastro preservado
   /v1/lawyer/me/dashboard:
     get:
       summary: Retorna dashboard seguro do advogado logado
@@ -478,6 +478,48 @@ paths:
           description: Advogado nao encontrado
         "422":
           description: Payload invalido
+  /v1/auth/password-recovery:
+    post:
+      summary: Solicita link seguro sem revelar existencia da conta
+      description: Resposta generica; envio assincrono limitado. Aceitacao HTTP nao comprova envio nem entrega. Cache-Control no-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+      responses:
+        "202": {description: Confirmacao generica para conhecido e desconhecido}
+        "422": {description: E-mail invalido}
+        "429": {description: Limite por origem}
+        "503": {description: Servico indisponivel para todos os destinatarios}
+  /v1/auth/password-reset:
+    post:
+      summary: Consome comprovante oficial recovery para definir senha
+      description: Nao aceita userID ou redirect arbitrario; nao retorna sessao. Link nao e consumido por GET. OTP expirado/usado/adulterado recebe mesmo erro.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tokenHash, type, newPassword, confirmPassword]
+              properties:
+                tokenHash: {type: string, pattern: '^[a-f0-9]{32,128}$', writeOnly: true}
+                type: {type: string, enum: [recovery]}
+                newPassword: {type: string, minLength: 8, maxLength: 72, writeOnly: true}
+                confirmPassword: {type: string, minLength: 8, maxLength: 72, writeOnly: true}
+      responses:
+        "200": {description: Senha atualizada; novo login necessario}
+        "401": {description: Comprovante invalido ou expirado/usado ou perfil nao autorizado}
+        "422": {description: Confirmacao divergente ou politica do Supabase recusou; solicitar outro link apos consumo}
+        "429": {description: Limite por origem}
+        "503": {description: Falha operacional ou reconciliacao apos troca parcial}
 components:
   securitySchemes:
     bearerAuth:
