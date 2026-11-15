@@ -1,0 +1,34 @@
+name: Quality gates
+on:
+  push:
+    branches: [main, feat/secure-auth-resend]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Reproducible install
+        run: npm ci
+      - name: CLI Harness
+        run: npm run harness
+      - name: Dependency audit (high and critical)
+        run: npm audit --audit-level=high
+      - name: Preserve harness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness
+          path: harness-results/latest.*
+          if-no-files-found: warn
