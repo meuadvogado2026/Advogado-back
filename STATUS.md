@@ -310,3 +310,8 @@ A troca de senha e o login normal no painel do advogado foram na conta de advoga
 ### Encerramento de fixtures e preview autorizado - 2026-11-15
 
 Usuario pediu seguir e aprovou o fluxo da conta existente; primeiro acesso humano da fixture permanece nao testado. Reenvio real HTTP200/Resend accepted com identidade preservada; nao e prova de recebimento. Fixtures client/lawyer removidas com ownership e ausencia Auth/dominio verificados, evidencia raiz spec024-live-final-cleanup.json. Proximo passo APK preview0.1.1/vc8 para validar Android; nenhum AAB/Play/landing publicado.
+
+
+## Correcao de codificacao antes da entrega - 2026-11-15
+
+Inspecao estrita UTF-8 detectou bytes CP1252 isolados em mensagens Auth de mobile/PasswordAccessScreen, admin/App e back/adminLawyers/routes. Corrigidos apenas esses bytes, preservando contratos/comportamento. Prova inicial: decode UTF-8 falhou; apos correcao todos os fontes/tests/scripts ts/tsx/json/css dos worktrees decodificam sem erro. Harness completo repetido nos tres. Build vc8 cancelado antes de disponibilizacao para evitar texto corrompido. Proximo candidato vc9 (vc8 ja observado no inventario), mesma assinatura/package. Teste Android sera manual pelo usuario, conforme escolha expressa.
