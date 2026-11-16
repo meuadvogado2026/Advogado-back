@@ -67,6 +67,7 @@ describe("secure password recovery", () => {
     expect(await mailer.send("controlled@example.test", "a".repeat(64))).toEqual({ status: "accepted", messageId: "mail-1" });
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(fetcher.mock.calls[0]![1]!.headers["Idempotency-Key"]).toBe(fetcher.mock.calls[1]![1]!.headers["Idempotency-Key"]);
+    expect(fetcher.mock.calls[0]![1]!.body).toBe(fetcher.mock.calls[1]![1]!.body);
     const body = JSON.parse(fetcher.mock.calls[0]![1]!.body);
     expect(body.text).toContain("https://admin.advogado20.com.br/redefinir-senha#token_hash=");
     expect(body.text).not.toContain("access_token");

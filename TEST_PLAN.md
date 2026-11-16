@@ -121,3 +121,9 @@ CON-022 recebe operations.prayers(total,pending,read,readPercentage), partners e
 Harness + testes de prova/replay/roles/compensacao, deeplink/refresh/logout e smoke webmock. Prova Supabase real com cleanup no back/scripts/auth024-provider-smoke.ts, executada somente para conta descartavel autorizada. Roteiroreal de email, Google, Android cold/warm e APK e bloqueante; consultar AUTH_LINKS.md.
 
 SPEC-024 TASK-245: CI quality.yml executa npmci/Harness/audit-high em Node22/Linux, com preservacao de evidencias. Excecao TDD para configuracao: prova substituta e execucao real do workflow GitHub; nao substitui Resend/Android.
+
+## Banner Auth aprovado — TASK248
+
+- tests/authEmailBanner.test.ts verifica hash exato da arte aprovada, dimensões PNG, peso, anexo único, CID correspondente, alt e fallback textual/CTA fora da imagem.
+- tests/passwordRecovery.test.ts verifica payload e chave idênticos no retry; testes de segurança de convite preservados.
+- Harness Node22 e smoke do dist com provedor interceptado; capturas Chromium600/360 e imagens bloqueadas em harness-results/email-banner/ na raiz geral. Sem envio real. Conferir Gmail/Outlook após publicação autorizada.
